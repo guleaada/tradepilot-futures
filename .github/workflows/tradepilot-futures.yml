@@ -1,0 +1,107 @@
+name: TradePilot-Futures cycle
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+# Serialize cycles: a run that starts while another holds the group QUEUES
+# rather than overlapping (cancel-in-progress: false keeps the in-flight run).
+# This prevents most races. The main remaining race source is a manual
+# "Run workflow" re-run landing on top of a scheduled run — the bookkeeping
+# commit step below is written to survive that without failing the job.
+concurrency:
+  group: tradepilot-futures-cycle
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (includes the committed SQLite DB)
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run one cycle (FUTURES TESTNET — no real funds)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Futures TESTNET keys from testnet.binancefuture.com (fake funds;
+          # rejected by mainnet). The executor base URL is hard-coded to the
+          # testnet — there is no way to point this workflow at real funds.
+          BINANCE_FUTURES_TESTNET_API_KEY: ${{ secrets.BINANCE_FUTURES_TESTNET_API_KEY }}
+          BINANCE_FUTURES_TESTNET_API_SECRET: ${{ secrets.BINANCE_FUTURES_TESTNET_API_SECRET }}
+          # Optional: leverage override (repo variable). Clamped to 5 in code.
+          FUTURES_LEVERAGE: ${{ vars.FUTURES_LEVERAGE }}
+          # Optional: Telegram alerts (no-op when unset).
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run cycle
+
+      - name: Generate report
+        run: npm run report
+
+      # The trading cycle already succeeded above. This is pure bookkeeping and
+      # must NEVER fail the job (set +e guards the whole section, exit 0 at the
+      # end). A benign push race just means the next run re-commits the DB.
+      #
+      # Failure modes this handles:
+      #  - actions/checkout leaves a DETACHED HEAD -> we checkout -B the branch.
+      #  - the SQLite DB is binary and cannot 3-way merge, so a concurrent
+      #    commit makes `git pull --rebase` conflict. We rebase with -X theirs
+      #    (keep THIS cycle's DB), abort cleanly on any failure, and retry.
+      - name: Commit updated DB and report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set +e
+          git config user.name "tradepilot-futures-bot"
+          git config user.email "tradepilot-futures-bot@users.noreply.github.com"
+          BRANCH="${GITHUB_REF_NAME:-main}"
+          git checkout -B "$BRANCH"            # ensure we are on a branch (checkout is detached)
+
+          git add data/tradepilot-futures.db reports/
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+            exit 0
+          fi
+          git commit -m "tradepilot-futures: cycle $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          pushed=0
+          for attempt in 1 2 3; do
+            git fetch origin "$BRANCH" || true
+            # Replay our single commit on the latest remote. During a rebase
+            # "theirs" is the commit being replayed, so -X theirs keeps OUR
+            # cycle's DB on the (unmergeable) binary conflict.
+            if git rebase -X theirs "origin/$BRANCH"; then
+              if git push origin "HEAD:$BRANCH"; then
+                pushed=1
+                break
+              fi
+            else
+              git rebase --abort 2>/dev/null || true
+            fi
+            echo "commit/push attempt $attempt did not land; backing off"
+            sleep $((attempt * 5))
+          done
+
+          if [ "$pushed" != 1 ]; then
+            echo "::warning::push failed after retries, will reconcile next run"
+            # Distinct, visible signal — NOT a trading failure. Best-effort,
+            # never fails the job.
+            node src/notify.js commit-failed "git push rejected after 3 retries" || true
+          fi
+          exit 0
