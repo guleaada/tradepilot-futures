@@ -32,14 +32,20 @@
 <tr><th>Expectancy / trade</th><td>n/a</td></tr>
 <tr><th>Max consecutive wins / losses</th><td>0 / 0</td></tr>
 <tr><th>Vol-targeting scale factor</th><td>1.00</td></tr>
-<tr><th>Today AI spend (Claude)</th><td>$0.0288</td></tr>
-<tr><th>Total AI spend</th><td>$0.0288</td></tr>
+<tr><th>Today AI spend (Claude)</th><td>$0.0612</td></tr>
+<tr><th>Total AI spend</th><td>$0.0612</td></tr>
 </table>
 
 <h2>P&amp;L by direction</h2>
 <table>
 <tr><th>Direction</th><th>Trades</th><th>Wins</th><th>Win rate</th><th>Total P&amp;L</th><th>Funding</th></tr>
 <tr><td colspan="6">no closed trades yet</td></tr>
+</table>
+
+<h2>Realized R by trend class (is the dynamic TP earning its keep?)</h2>
+<table>
+<tr><th>Trend at entry</th><th>Trades</th><th>Wins</th><th>Avg realized R</th><th>Total P&amp;L</th></tr>
+<tr><td colspan="5">no closed trades yet</td></tr>
 </table>
 
 <h2>Regime accuracy (profitable trades per regime at entry)</h2>
@@ -50,14 +56,14 @@
 
 <h2>Open positions</h2>
 <table>
-<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
-<tr><td colspan="10">none</td></tr>
+<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Trend</th><th>TP×ATR</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
+<tr><td colspan="12">none</td></tr>
 </table>
 
 <h2>Closed trades</h2>
 <table>
-<tr><th>Pair</th><th>Direction</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
-<tr><td colspan="9">none</td></tr>
+<tr><th>Pair</th><th>Direction</th><th>Trend</th><th>TP×ATR</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
+<tr><td colspan="11">none</td></tr>
 </table>
 
 
@@ -65,10 +71,15 @@
 <h2>Last 10 regime calls</h2>
 <table>
 <tr><th>Time</th><th>Pair</th><th>Regime</th><th>Conf</th><th>Trade allowed</th><th>Cost</th><th>Reasoning</th></tr>
+<tr><td>2026-07-04T09:10:09.515Z</td><td>LTCUSDT</td><td>bullish</td><td>62</td><td>yes</td><td>$0.0052</td><td style="text-align:left">Price trades above all 1h EMAs in bullish alignment and is 3% above the 4h EMA50, with RSI holding mid-range at 55.74 — structure favors longs. Low volatility and slightly negative funding rate temper</td></tr>
+<tr><td>2026-07-04T09:10:03.259Z</td><td>NEARUSDT</td><td>chop</td><td>38</td><td>no</td><td>$0.0060</td><td style="text-align:left">Price is drifting lower on the 1h but sits between 4h EMAs with the 4h EMA200 overhead at 2.10 creating resistance while 4h EMA20/50 provide support below — no clean directional structure. RSI at 41 a</td></tr>
+<tr><td>2026-07-04T09:09:58.091Z</td><td>DOGEUSDT</td><td>chop</td><td>35</td><td>no</td><td>$0.0051</td><td style="text-align:left">Price action is completely flat across the last 5 hourly candles with near-zero range and all EMAs tightly clustered, indicating a low-volatility consolidation with no directional edge. The mild 24h g</td></tr>
+<tr><td>2026-07-04T09:09:51.156Z</td><td>SUIUSDT</td><td>chop</td><td>35</td><td>no</td><td>$0.0053</td><td style="text-align:left">Price is locked in an extremely tight range (~0.76) across all recent 1h candles with RSI near 50, signaling no directional conviction despite a mildly bullish EMA structure. Low ATR and sideways cons</td></tr>
+<tr><td>2026-07-04T09:09:44.441Z</td><td>LINKUSDT</td><td>bullish</td><td>55</td><td>yes</td><td>$0.0057</td><td style="text-align:left">Price is above all 1H EMAs in a bullish stack and holding +1.6% on the day with neutral funding, suggesting a mild upward bias. However, tight recent consolidation and price sitting below the 4H EMA20</td></tr>
+<tr><td>2026-07-04T09:09:38.197Z</td><td>AVAXUSDT</td><td>chop</td><td>35</td><td>no</td><td>$0.0051</td><td style="text-align:left">Price is grinding lower in a tight range (~6.84–6.94) with RSI near 46 and near-flat 24h change, indicating no clear directional momentum. Low ATR and compressed candles signal a consolidation phase w</td></tr>
 <tr><td>2026-07-04T08:25:13.811Z</td><td>XRPUSDT</td><td>bullish</td><td>68</td><td>yes</td><td>$0.0064</td><td style="text-align:left">Price is trading above all 1h EMAs in proper bullish stack with a 4.23% 24h gain and RSI at 67 showing momentum without extreme overbought conditions. The 1h OHLC shows tight consolidation near the hi</td></tr>
 <tr><td>2026-07-04T08:25:08.033Z</td><td>BNBUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0059</td><td style="text-align:left">Price is stacked above all 1h EMAs and the 4h short-term EMAs with a positive 24h return and RSI in mild bullish territory, supporting a cautious long bias. However, the 4h e200 at 589.87 provides not</td></tr>
 <tr><td>2026-07-04T08:25:02.406Z</td><td>SOLUSDT</td><td>bullish</td><td>68</td><td>yes</td><td>$0.0054</td><td style="text-align:left">Price is cleanly above all major EMAs on both 1h and 4h with bullish stacking, and RSI at 55 leaves room to run. Recent candles show minor consolidation but no structural breakdown, supporting continu</td></tr>
 <tr><td>2026-07-04T08:24:55.002Z</td><td>ETHUSDT</td><td>bullish</td><td>72</td><td>yes</td><td>$0.0054</td><td style="text-align:left">ETH is trading above all key EMAs on both 1h and 4h timeframes with price 6%+ above 4h EMA50, indicating sustained bullish structure. RSI at 63 supports continued momentum without overbought risk, and</td></tr>
-<tr><td>2026-07-04T08:24:48.242Z</td><td>BTCUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0057</td><td style="text-align:left">Price sits above all 1h EMAs in a bullish stack and 2.43% above the 4h EMA50 with RSI at 59.56 and a positive 24h drift, suggesting modest upside momentum. However, the 4h EMA200 at ~63000 looms as ne</td></tr>
 </table>
 </body></html>
