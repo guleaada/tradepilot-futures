@@ -89,6 +89,73 @@ export function atr(candles, period = 14) {
   return out;
 }
 
+// Wilder's ADX over candles: [{high, low, close}, ...]. Trend STRENGTH
+// (direction-blind), 0-100. Chosen over an EMA-slope proxy because it is the
+// standard, has textbook-verifiable math like the other indicators here, and
+// needs no extra tuning knobs (the slope proxy would need its own
+// normalization window + percentile thresholds).
+//
+// Textbook definition: +DM_i = max(high_i - high_{i-1}, 0) when it exceeds
+// the down-move (else 0), mirrored for -DM; smooth TR/+DM/-DM with Wilder's
+// running sums; DI = 100 * smDM / smTR; DX = 100 * |+DI - -DI| / (+DI + -DI);
+// ADX = Wilder-smoothed DX (seeded with the mean of the first `period` DXs).
+// First value lands at index 2*period - 1; earlier positions are null.
+export function adx(candles, period = 14) {
+  const n = candles.length;
+  const out = new Array(n).fill(null);
+  if (n <= 2 * period) return out;
+
+  const plusDM = new Array(n).fill(0);
+  const minusDM = new Array(n).fill(0);
+  const trs = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const up = candles[i].high - candles[i - 1].high;
+    const down = candles[i - 1].low - candles[i].low;
+    plusDM[i] = up > down && up > 0 ? up : 0;
+    minusDM[i] = down > up && down > 0 ? down : 0;
+    const pc = candles[i - 1].close;
+    trs[i] = Math.max(candles[i].high - candles[i].low, Math.abs(candles[i].high - pc), Math.abs(candles[i].low - pc));
+  }
+
+  const dxFrom = (smTR, smPlus, smMinus) => {
+    if (!(smTR > 0)) return 0;
+    const pDI = (smPlus / smTR) * 100;
+    const mDI = (smMinus / smTR) * 100;
+    const sum = pDI + mDI;
+    return sum > 0 ? (Math.abs(pDI - mDI) / sum) * 100 : 0;
+  };
+
+  // Wilder smoothing: seed with plain sums over bars 1..period, then
+  // sm' = sm - sm/period + current.
+  let smTR = 0;
+  let smPlus = 0;
+  let smMinus = 0;
+  for (let i = 1; i <= period; i++) {
+    smTR += trs[i];
+    smPlus += plusDM[i];
+    smMinus += minusDM[i];
+  }
+  const dx = new Array(n).fill(null);
+  dx[period] = dxFrom(smTR, smPlus, smMinus);
+  for (let i = period + 1; i < n; i++) {
+    smTR = smTR - smTR / period + trs[i];
+    smPlus = smPlus - smPlus / period + plusDM[i];
+    smMinus = smMinus - smMinus / period + minusDM[i];
+    dx[i] = dxFrom(smTR, smPlus, smMinus);
+  }
+
+  // ADX seed = mean of the first `period` DX values (indices period..2p-1).
+  let seed = 0;
+  for (let i = period; i < 2 * period; i++) seed += dx[i];
+  let prev = seed / period;
+  out[2 * period - 1] = prev;
+  for (let i = 2 * period; i < n; i++) {
+    prev = (prev * (period - 1) + dx[i]) / period;
+    out[i] = prev;
+  }
+  return out;
+}
+
 // Percentage returns of a price series: r_i = p_i / p_{i-1} - 1.
 export function returns(values) {
   const out = [];

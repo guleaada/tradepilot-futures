@@ -45,7 +45,16 @@ export const config = {
   // failover as the spot bot); orders execute on the futures testnet book.
   // USD-M futures track spot closely enough for 1h/4h/1d signals, and actual
   // fill prices are always recorded from the exchange response.
-  pairs: list(process.env.PAIRS, ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']),
+  // Expanded universe of liquid USD-M perpetuals. MAX_POSITIONS stays 2 on
+  // purpose: more pairs means the 2 slots draw from a larger pool of setups
+  // (higher trade frequency), NOT more concurrent risk. The liquidity filter
+  // below self-prunes anything too thin per run (futures 24h quote volume,
+  // spot volume as the proxy where the futures endpoint is geo-blocked).
+  pairs: list(process.env.PAIRS, [
+    'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
+    'AVAXUSDT', 'LINKUSDT', 'APTUSDT', 'ARBUSDT', 'INJUSDT',
+    'SUIUSDT', 'TIAUSDT', 'DOGEUSDT', 'NEARUSDT', 'LTCUSDT',
+  ]),
   liquidityMinVolume24h: num(process.env.LIQUIDITY_MIN_VOLUME_24H, 10_000_000),
   binanceBase: process.env.BINANCE_BASE || 'https://api.binance.com',
   binanceFapiBase: process.env.BINANCE_FAPI_BASE || 'https://fapi.binance.com',
@@ -98,6 +107,19 @@ export const config = {
   riskPerTrade: num(process.env.RISK_PER_TRADE, 0.01),
   stopAtrMult: num(process.env.STOP_ATR_MULT, 1.5),
   tpAtrMult: num(process.env.TP_ATR_MULT, 2.5),
+
+  // --- trend-scaled dynamic take-profit ---
+  // TP distance scales with trend strength (ADX-14 on the 4h candles — same
+  // timeframe as the EMA50 trend filter) so winners run further in strong
+  // trends. The STOP distance never changes: risk stays fixed, only reward
+  // widens. With the flag off, behavior is byte-identical to the fixed
+  // tpAtrMult above (proven in tests).
+  dynamicTpEnabled: process.env.DYNAMIC_TP_ENABLED !== 'false',
+  tpAtrMultWeak: num(process.env.TP_ATR_MULT_WEAK, 2.0), // weak/ranging tape
+  tpAtrMultNormal: num(process.env.TP_ATR_MULT_NORMAL, 2.5), // = today's fixed default
+  tpAtrMultStrong: num(process.env.TP_ATR_MULT_STRONG, 4.5), // strong trend: let it run
+  adxStrong: num(process.env.ADX_STRONG, 30), // ADX >= this -> strong
+  adxWeak: num(process.env.ADX_WEAK, 18), // ADX < this -> weak
   maxPositions: num(process.env.MAX_POSITIONS, 2),
   maxNotionalPct: num(process.env.MAX_NOTIONAL_PCT, 0.25),
   dailyDrawdownHalt: num(process.env.DAILY_DRAWDOWN_HALT, 0.03),

@@ -59,6 +59,42 @@ export function computePositionSize(equity, price, atrValue, cfg = config, regim
   return { qty, stopDist, notional: qty * price, capped, riskPct };
 }
 
+// --- trend-scaled dynamic take-profit ---
+// Trend strength comes from ADX(14) on the 4h candles (direction-blind, same
+// timeframe as the EMA50 trend filter). ADX was chosen over an EMA-slope
+// proxy: standard definition, textbook-verifiable math, no extra
+// normalization knobs. A missing/NaN ADX classifies as 'normal' — i.e.
+// exactly today's fixed-TP behavior, never wider.
+export function classifyTrend(adxValue, cfg = config) {
+  if (!Number.isFinite(adxValue)) return 'normal';
+  if (adxValue >= cfg.adxStrong) return 'strong';
+  if (adxValue < cfg.adxWeak) return 'weak';
+  return 'normal';
+}
+
+// TP distance multiplier (x ATR) for a trend class. With the flag off this is
+// the fixed tpAtrMult — byte-identical to pre-dynamic-TP behavior. The STOP
+// multiplier is deliberately not touched anywhere: risk stays fixed, only
+// reward scales.
+export function tpMultiplierFor(trendClass, cfg = config) {
+  if (!cfg.dynamicTpEnabled) return cfg.tpAtrMult;
+  if (trendClass === 'strong') return cfg.tpAtrMultStrong;
+  if (trendClass === 'weak') return cfg.tpAtrMultWeak;
+  return cfg.tpAtrMultNormal;
+}
+
+// R-multiple the post-partial runner targets. Scales the base extendedTpR by
+// the trade's stored TP multiple relative to normal, so a strong-trend trade
+// (tp_mult 4.5 vs normal 2.5) sends its runner to 4.0 * 1.8 = 7.2R. Falls
+// back to the flat extendedTpR when the flag is off or the trade predates
+// the tp_mult column — identical to prior behavior.
+export function runnerTargetR(position, cfg = config) {
+  if (!cfg.dynamicTpEnabled || !(position.tp_mult > 0) || !(cfg.tpAtrMultNormal > 0)) {
+    return cfg.extendedTpR;
+  }
+  return cfg.extendedTpR * (position.tp_mult / cfg.tpAtrMultNormal);
+}
+
 // Isolated-margin liquidation estimate for a USD-M linear contract.
 // effLeverage = notional / margin. The liquidation distance from entry is
 // roughly (1/effLeverage - maintMarginRate) of the entry price.
@@ -151,7 +187,9 @@ export function trailingStopActions(position, price, cfg = config) {
       action: 'partial_exit',
       closeQty: position.qty * cfg.partialExitFraction,
       newStop: entry,
-      newTp: entry + d * cfg.extendedTpR * R,
+      // Runner target scales with the trade's dynamic-TP class (see
+      // runnerTargetR): flat extendedTpR when the flag is off.
+      newTp: entry + d * runnerTargetR(position, cfg) * R,
     });
   }
   return actions;
@@ -234,7 +272,7 @@ export function isHalted(equity, db = getDb(), cfg = config, nowMs = Date.now())
 // taken. Executor calls are awaited (real network fills on testnet). An
 // executor may return { skipped: <reason> }; never throws for skips.
 export async function runPairRules({
-  pair, price, atr1h, rsi1h, ema50_4h, dailyEma50 = null, regime,
+  pair, price, atr1h, rsi1h, ema50_4h, dailyEma50 = null, regime, adx4h = null,
   volumeRatio = null, rsiBounds = null, correlationBlocked = false,
   executor, db = getDb(), cfg = config, prices = {}, entriesBlocked = false,
   volScale = 1, now = Date.now(),
@@ -369,12 +407,16 @@ export async function runPairRules({
   }
   const tradeQty = fill.executedQty ?? qty;
   const d = directionSign(direction);
-  const stopPrice = fill.fillPrice - d * sized.stopDist;
-  const tpPrice = fill.fillPrice + d * cfg.tpAtrMult * atr1h;
+  const stopPrice = fill.fillPrice - d * sized.stopDist; // stop distance NEVER scales with trend
+  const trendClass = classifyTrend(adx4h, cfg);
+  const tpMult = tpMultiplierFor(trendClass, cfg);
+  const tpPrice = fill.fillPrice + d * tpMult * atr1h;
   const tradeId = openTrade(
     {
       pair, direction, qty: tradeQty, fillPrice: fill.fillPrice, fee: fill.fee, stopPrice, tpPrice,
       leverage: cfg.leverage,
+      trendClass: cfg.dynamicTpEnabled ? trendClass : null,
+      tpMult,
       orderId: fill.orderId ?? null,
       regimeAtEntry: regime?.regime ?? null,
       confidenceAtEntry: regime?.confidence ?? null,
@@ -385,10 +427,13 @@ export async function runPairRules({
   logEvent('TRADE_OPENED', {
     pair, tradeId, direction, leverage: cfg.leverage, qty: tradeQty,
     entry: fill.fillPrice, signal: price, stop: stopPrice, tp: tpPrice, riskPct: sized.riskPct, volScale,
+    trend: cfg.dynamicTpEnabled ? trendClass : null, tpMult,
+    adx4h: Number.isFinite(adx4h) ? Number(adx4h.toFixed(2)) : null,
   }, db, atIso);
   actions.push({
     type: 'open', pair, tradeId, direction, leverage: cfg.leverage, qty: tradeQty,
     entry: fill.fillPrice, signal: price, stop: stopPrice, tp: tpPrice,
+    trend: cfg.dynamicTpEnabled ? trendClass : null, tpMult,
   });
   return actions;
 }

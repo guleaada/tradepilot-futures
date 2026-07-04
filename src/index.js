@@ -13,8 +13,8 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { config, MAX_ALLOWED_LEVERAGE } from './config.js';
 import { closeDb, getDb, logEvent, nowIso } from './db.js';
-import { getDailyKlines, getFundingRate, getKlines, getTicker24h } from './data/binance.js';
-import { atr, correlation, ema, last, returns, rsi, sma, volatility } from './indicators.js';
+import { getDailyKlines, getFundingRate, getFuturesTicker24h, getKlines, getTicker24h } from './data/binance.js';
+import { adx, atr, correlation, ema, last, returns, rsi, sma, volatility } from './indicators.js';
 import { buildMarketSummary, getRegime, regimeCallOutcomes } from './ai/regime.js';
 import { sendAlert } from './alert.js';
 import {
@@ -69,12 +69,14 @@ function checkDbIntegrity(db) {
   }
 }
 
-// Drop illiquid pairs for this run. Lenient by design — a pair is only
-// excluded on a *confirmed* low volume reading. Any lookup failure or
-// non-finite/zero volume KEEPS the pair, so a data hiccup can never silently
-// zero out the whole universe.
+// Drop illiquid pairs for this run, judged by the FUTURES 24h quote volume
+// (getFuturesTicker24h; falls back to spot volume as a proxy where the
+// futures endpoint is geo-blocked — see data/binance.js). Lenient by design —
+// a pair is only excluded on a *confirmed* low volume reading. Any lookup
+// failure or non-finite/zero volume KEEPS the pair, so a data hiccup can
+// never silently zero out the whole universe.
 export async function filterPairsByLiquidity(db, deps = {}) {
-  const ticker = deps.getTicker24h ?? getTicker24h;
+  const ticker = deps.getTicker24h ?? getFuturesTicker24h;
   const kept = [];
   for (const pair of config.pairs) {
     try {
@@ -87,8 +89,8 @@ export async function filterPairsByLiquidity(db, deps = {}) {
       } else if (vol >= config.liquidityMinVolume24h) {
         kept.push(pair);
       } else {
-        logEvent('PAIR_EXCLUDED', { pair, quoteVolume24h: vol, min: config.liquidityMinVolume24h }, db);
-        console.log(`[${pair}] excluded: 24h quote volume ${Math.round(vol).toLocaleString()} < ${config.liquidityMinVolume24h.toLocaleString()}`);
+        logEvent('PAIR_EXCLUDED', { pair, quoteVolume24h: vol, min: config.liquidityMinVolume24h, source: t?.source ?? 'unknown' }, db);
+        console.log(`[${pair}] excluded: 24h quote volume ${Math.round(vol).toLocaleString()} < ${config.liquidityMinVolume24h.toLocaleString()} (${t?.source ?? 'unknown'})`);
       }
     } catch (err) {
       kept.push(pair); // lookup threw (e.g. geo-block) -> keep, never silently drop
@@ -135,6 +137,7 @@ async function loadMarket(pair) {
     ema20_4h: last(ema(closes4h, 20)),
     ema50_4h: last(ema(closes4h, 50)),
     ema200_4h: last(ema(closes4h, 200)),
+    adx4h: last(adx(k4h, 14)), // trend strength for the dynamic take-profit
     dailyEma50: last(ema(closesDaily, 50)),
     volumeRatio: volSma20 > 0 ? volumes1h[volumes1h.length - 1] / volSma20 : null,
     vol20: volatility(closes1h, 20),
@@ -348,6 +351,7 @@ export async function runCycle(db = getDb()) {
         rsi1h: market.rsi1h,
         ema50_4h: market.ema50_4h,
         dailyEma50: market.dailyEma50,
+        adx4h: market.adx4h,
         volumeRatio: market.volumeRatio,
         rsiBounds: dynamicRsiBounds(market.atrSeries1h, config),
         correlationBlocked: correlationBlockedFor(pair, markets, db, config),
@@ -363,8 +367,9 @@ export async function runCycle(db = getDb()) {
           const dirTag = a.direction.toUpperCase();
           const dirEmoji = a.direction === 'short' ? '🔴' : '🟢';
           const slipBps = ((a.entry / a.signal - 1) * 10_000).toFixed(1);
-          console.log(`[${pair}] OPEN ${dirTag} ${a.leverage}x qty=${a.qty.toFixed(6)} fill=${a.entry.toFixed(2)} (signal ${a.signal.toFixed(2)}, ${slipBps}bps) stop=${a.stop.toFixed(2)} tp=${a.tp.toFixed(2)}`);
-          await sendAlert(`${dirEmoji} ${dirTag} ${pair} ${a.leverage}x qty ${a.qty.toFixed(6)} @ ${a.entry.toFixed(2)} | stop ${a.stop.toFixed(2)} | tp ${a.tp.toFixed(2)}`);
+          const trendTag = a.trend ? `[trend: ${a.trend}, tp ${a.tpMult}xATR] ` : '';
+          console.log(`[${pair}] OPEN ${dirTag} ${a.leverage}x ${trendTag}qty=${a.qty.toFixed(6)} fill=${a.entry.toFixed(2)} (signal ${a.signal.toFixed(2)}, ${slipBps}bps) stop=${a.stop.toFixed(2)} tp=${a.tp.toFixed(2)}`);
+          await sendAlert(`${dirEmoji} ${dirTag} ${pair} ${a.leverage}x ${trendTag}qty ${a.qty.toFixed(6)} @ ${a.entry.toFixed(2)} | stop ${a.stop.toFixed(2)} | tp ${a.tp.toFixed(2)}`);
         } else if (a.type === 'close') {
           const dirTag = a.direction.toUpperCase();
           const slipBps = ((a.exit / a.signal - 1) * 10_000).toFixed(1);

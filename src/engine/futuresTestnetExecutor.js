@@ -270,7 +270,15 @@ export class FuturesTestnetExecutor {
 // reporting has something to show. Works for LONG and SHORT scenarios: the
 // order handler fills SELL as readily as BUY.
 export function createMockFuturesFetch({
-  prices = { BTCUSDT: 66900, ETHUSDT: 2670 },
+  // Fill prices sit near each pair's mock last close (uptrend ~= base*1.12,
+  // downtrend ~= base*0.88) so fill-vs-signal slippage stays realistic. Every
+  // liquidity-filter-surviving mock pair needs an entry here, or an order for
+  // it throws "no exchange filters loaded".
+  prices = {
+    BTCUSDT: 66900, ETHUSDT: 2670, BNBUSDT: 522,
+    AVAXUSDT: 33.6, LINKUSDT: 13.2, ARBUSDT: 0.9, INJUSDT: 22,
+    SUIUSDT: 3.36, DOGEUSDT: 0.106, NEARUSDT: 5.6, LTCUSDT: 88,
+  },
   walletBalance = 1000,
   failFirstOrderWith = null, // e.g. { code: -1021, msg: 'Timestamp outside recvWindow' }
   marginTypeAlreadySet = false, // respond -4046 to POST /fapi/v1/marginType

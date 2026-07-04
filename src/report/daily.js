@@ -64,6 +64,23 @@ export function computeStats(db = getDb()) {
     )
     .all();
 
+  // Average realized R by trend class: does the dynamic TP earn its keep?
+  // Realized R = pnl / (initial R distance x original qty). Trades opened
+  // before the feature (or with the flag off) group under '(fixed tp)'.
+  const byTrend = db
+    .prepare(
+      `SELECT COALESCE(trend_class, '(fixed tp)') AS trend, COUNT(*) AS trades,
+              SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) AS wins,
+              AVG(pnl / (initial_risk * entry_qty)) AS avg_r,
+              COALESCE(SUM(pnl), 0) AS total_pnl
+       FROM trades
+       WHERE status = 'closed' AND initial_risk > 0 AND entry_qty > 0
+       GROUP BY COALESCE(trend_class, '(fixed tp)')
+       ORDER BY CASE COALESCE(trend_class, '(fixed tp)')
+                WHEN 'strong' THEN 0 WHEN 'normal' THEN 1 WHEN 'weak' THEN 2 ELSE 3 END`,
+    )
+    .all();
+
   // Regime accuracy: how often each regime label at entry produced a winner.
   const regimeAccuracy = db
     .prepare(
@@ -85,6 +102,7 @@ export function computeStats(db = getDb()) {
     maxConsecWins,
     maxConsecLosses,
     byDirection,
+    byTrend,
     regimeAccuracy,
     closed,
     snapshots,
@@ -172,6 +190,12 @@ ${equityCurveSvg(stats.snapshots)}
 ${stats.byDirection.map((d) => `<tr><td>${esc(d.direction)}</td><td>${d.trades}</td><td>${d.wins}</td><td>${d.trades ? ((d.wins / d.trades) * 100).toFixed(1) : 'n/a'}%</td><td class="${d.total_pnl >= 0 ? 'pos' : 'neg'}">${usd(d.total_pnl)}</td><td>${usd(d.funding)}</td></tr>`).join('\n') || '<tr><td colspan="6">no closed trades yet</td></tr>'}
 </table>
 
+<h2>Realized R by trend class (is the dynamic TP earning its keep?)</h2>
+<table>
+<tr><th>Trend at entry</th><th>Trades</th><th>Wins</th><th>Avg realized R</th><th>Total P&amp;L</th></tr>
+${stats.byTrend.map((t) => `<tr><td>${esc(t.trend)}</td><td>${t.trades}</td><td>${t.wins}</td><td class="${(t.avg_r ?? 0) >= 0 ? 'pos' : 'neg'}">${t.avg_r === null ? 'n/a' : t.avg_r.toFixed(2)}R</td><td class="${t.total_pnl >= 0 ? 'pos' : 'neg'}">${usd(t.total_pnl)}</td></tr>`).join('\n') || '<tr><td colspan="5">no closed trades yet</td></tr>'}
+</table>
+
 <h2>Regime accuracy (profitable trades per regime at entry)</h2>
 <table>
 <tr><th>Regime</th><th>Trades</th><th>Correct</th><th>Hit rate</th><th>Avg return %</th></tr>
@@ -180,14 +204,14 @@ ${stats.regimeAccuracy.map((r) => `<tr><td>${esc(r.regime)}</td><td>${r.trades}<
 
 <h2>Open positions</h2>
 <table>
-<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
-${open.map((p) => `<tr><td>${esc(p.pair)}</td><td>${dirTag(p.direction)}</td><td>${p.leverage ?? config.leverage}x</td><td>${p.qty.toFixed(6)}</td><td>${p.entry_price.toFixed(2)}</td><td>${p.stop_price.toFixed(2)}</td><td>${p.tp_price.toFixed(2)}</td><td>${usd(p.margin ?? 0)}</td><td>${usd(p.funding_paid ?? 0)}</td><td>${esc(p.entry_time)}</td></tr>`).join('\n') || '<tr><td colspan="10">none</td></tr>'}
+<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Trend</th><th>TP×ATR</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
+${open.map((p) => `<tr><td>${esc(p.pair)}</td><td>${dirTag(p.direction)}</td><td>${p.leverage ?? config.leverage}x</td><td>${esc(p.trend_class ?? '—')}</td><td>${p.tp_mult ?? '—'}</td><td>${p.qty.toFixed(6)}</td><td>${p.entry_price.toFixed(2)}</td><td>${p.stop_price.toFixed(2)}</td><td>${p.tp_price.toFixed(2)}</td><td>${usd(p.margin ?? 0)}</td><td>${usd(p.funding_paid ?? 0)}</td><td>${esc(p.entry_time)}</td></tr>`).join('\n') || '<tr><td colspan="12">none</td></tr>'}
 </table>
 
 <h2>Closed trades</h2>
 <table>
-<tr><th>Pair</th><th>Direction</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
-${stats.closed.map((t) => `<tr><td>${esc(t.pair)}</td><td>${dirTag(t.direction)}</td><td>${t.entry_price.toFixed(2)}</td><td>${(t.exit_price ?? 0).toFixed(2)}</td><td>${t.qty.toFixed(6)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${usd(t.pnl)}</td><td>${usd(t.funding_paid ?? 0)}</td><td>${esc(t.exit_reason)}</td><td>${esc(t.exit_time)}</td></tr>`).join('\n') || '<tr><td colspan="9">none</td></tr>'}
+<tr><th>Pair</th><th>Direction</th><th>Trend</th><th>TP×ATR</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
+${stats.closed.map((t) => `<tr><td>${esc(t.pair)}</td><td>${dirTag(t.direction)}</td><td>${esc(t.trend_class ?? '—')}</td><td>${t.tp_mult ?? '—'}</td><td>${t.entry_price.toFixed(2)}</td><td>${(t.exit_price ?? 0).toFixed(2)}</td><td>${t.qty.toFixed(6)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${usd(t.pnl)}</td><td>${usd(t.funding_paid ?? 0)}</td><td>${esc(t.exit_reason)}</td><td>${esc(t.exit_time)}</td></tr>`).join('\n') || '<tr><td colspan="11">none</td></tr>'}
 </table>
 
 ${orders.length ? `<h2>Recent orders — real fill vs signal price</h2>
