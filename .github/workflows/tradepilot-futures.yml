@@ -45,6 +45,10 @@ jobs:
           BINANCE_FUTURES_TESTNET_API_SECRET: ${{ secrets.BINANCE_FUTURES_TESTNET_API_SECRET }}
           # Optional: leverage override (repo variable). Clamped to 5 in code.
           FUTURES_LEVERAGE: ${{ vars.FUTURES_LEVERAGE }}
+          # Must match the futures testnet account's USDT wallet balance, or
+          # the reconcile guard flags STATE_MISMATCH and blocks all entries.
+          # (Only seeds a FRESH database; the committed DB carries its own cash.)
+          START_BALANCE: ${{ vars.START_BALANCE }}
           # Optional: Telegram alerts (no-op when unset).
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
