@@ -1,0 +1,95 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>TradePilot-Futures 2026-07-06</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; font-size: 13px; text-align: right; }
+  th { background: #f3f4f6; }
+  td:first-child, th:first-child { text-align: left; }
+  .neg { color: #dc2626; } .pos { color: #16a34a; }
+  h2 { margin-top: 2rem; }
+  .banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 6px; }
+</style></head><body>
+<h1>TradePilot-Futures — Daily Report 2026-07-06</h1>
+<p class="banner"><strong>EXECUTOR: FUTURES TESTNET (3x leverage)</strong> — Binance USD-M futures testnet, isolated margin, long + short. <strong>No real funds.</strong> Mainnet futures trading is intentionally not implemented. Runs in parallel with the spot TradePilot for a 30-day A/B comparison.</p>
+
+<h2>Equity curve</h2>
+<svg width="720" height="220" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="220" fill="#fafafa" stroke="#ddd"/>
+  <text x="36" y="18" font-family="monospace" font-size="12">max 5000.00</text>
+  <text x="36" y="212" font-family="monospace" font-size="12">min 5000.00</text>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2" points="36.0,184.0 63.0,184.0 90.0,184.0 117.0,184.0 144.0,184.0 171.0,184.0 198.0,184.0 225.0,184.0 252.0,184.0 279.0,184.0 306.0,184.0 333.0,184.0 360.0,184.0 387.0,184.0 414.0,184.0 441.0,184.0 468.0,184.0 495.0,184.0 522.0,184.0 549.0,184.0 576.0,184.0 603.0,184.0 630.0,184.0 657.0,184.0 684.0,184.0"/>
+</svg>
+
+<h2>Summary</h2>
+<table>
+<tr><th>Equity</th><td>$5000.00</td></tr>
+<tr><th>Wallet cash</th><td>$5000.00</td></tr>
+<tr><th>Margin locked</th><td>$0.00</td></tr>
+<tr><th>Available balance</th><td>$5000.00</td></tr>
+<tr><th>Leverage</th><td>3x (isolated)</td></tr>
+<tr><th>Closed trades</th><td>0</td></tr>
+<tr><th>Win rate</th><td>n/a</td></tr>
+<tr><th>Profit factor</th><td>n/a</td></tr>
+<tr><th>Total P&amp;L</th><td class="pos">$0.00</td></tr>
+<tr><th>Total funding paid</th><td>$0.00</td></tr>
+<tr><th>Max drawdown</th><td>0.0%</td></tr>
+<tr><th>Expectancy / trade</th><td>n/a</td></tr>
+<tr><th>Max consecutive wins / losses</th><td>0 / 0</td></tr>
+<tr><th>Vol-targeting scale factor</th><td>1.00</td></tr>
+<tr><th>Today AI spend (Claude)</th><td>$0.0407</td></tr>
+<tr><th>Total AI spend</th><td>$0.5115</td></tr>
+</table>
+
+<h2>P&amp;L by direction</h2>
+<table>
+<tr><th>Direction</th><th>Trades</th><th>Wins</th><th>Win rate</th><th>Total P&amp;L</th><th>Funding</th></tr>
+<tr><td colspan="6">no closed trades yet</td></tr>
+</table>
+
+<h2>Realized R by trend class (is the dynamic TP earning its keep?)</h2>
+<table>
+<tr><th>Trend at entry</th><th>Trades</th><th>Wins</th><th>Avg realized R</th><th>Total P&amp;L</th></tr>
+<tr><td colspan="5">no closed trades yet</td></tr>
+</table>
+
+<h2>Regime accuracy (profitable trades per regime at entry)</h2>
+<table>
+<tr><th>Regime</th><th>Trades</th><th>Correct</th><th>Hit rate</th><th>Avg return %</th></tr>
+<tr><td colspan="5">no completed trades with regime data yet</td></tr>
+</table>
+
+<h2>Open positions</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Trend</th><th>TP×ATR</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
+<tr><td colspan="12">none</td></tr>
+</table>
+
+<h2>Closed trades</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Trend</th><th>TP×ATR</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
+<tr><td colspan="11">none</td></tr>
+</table>
+
+<h2>Recent orders — real fill vs signal price</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Side</th><th>Dir</th><th>Req qty</th><th>Exec qty</th><th>Signal</th><th>Fill</th><th>Slip (bps)</th><th>Status</th><th>Order ID</th></tr>
+<tr><td>2026-07-06T01:58:55.883Z</td><td>NEARUSDT</td><td>BUY</td><td>long</td><td>624</td><td>624</td><td>2.00</td><td></td><td>n/a</td><td>FILLED</td><td>421342379</td></tr>
+<tr><td>2026-07-05T23:54:24.009Z</td><td>NEARUSDT</td><td>BUY</td><td>long</td><td>620</td><td>620</td><td>2.02</td><td></td><td>n/a</td><td>FILLED</td><td>420848765</td></tr>
+</table>
+
+<h2>Last 10 regime calls</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Regime</th><th>Conf</th><th>Trade allowed</th><th>Cost</th><th>Reasoning</th></tr>
+<tr><td>2026-07-06T01:58:55.927Z</td><td>LTCUSDT</td><td>bullish</td><td>62</td><td>yes</td><td>$0.0059</td><td style="text-align:left">Price remains well above all key EMAs on both 1h and 4h timeframes with clean bullish stack, and the 24h gain of +2.46% supports continued momentum. The last candle pullback and flat recent returns su</td></tr>
+<tr><td>2026-07-06T01:58:50.368Z</td><td>DOGEUSDT</td><td>chop</td><td>15</td><td>no</td><td>$0.0052</td><td style="text-align:left">Price has been completely frozen at 0.08 across all five 1h candles with near-zero volatility and flat EMAs, indicating total absence of directional momentum. Consistent chop regime calls with zero re</td></tr>
+<tr><td>2026-07-06T01:58:45.503Z</td><td>SUIUSDT</td><td>chop</td><td>55</td><td>no</td><td>$0.0051</td><td style="text-align:left">Price is pinned at EMA20/EMA50 convergence with RSI near 50 and a tight 1h range showing no directional momentum. Five consecutive chop calls with zero returns confirm the absence of a clear edge.</td></tr>
+<tr><td>2026-07-06T01:58:39.378Z</td><td>XRPUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0064</td><td style="text-align:left">Price sits above all major EMAs on both 1h and 4h timeframes with a clean bullish stack, RSI at 59.55 supports moderate upward momentum without being overbought. The recent fade from 1.17 to 1.15 intr</td></tr>
+<tr><td>2026-07-06T01:58:32.213Z</td><td>SOLUSDT</td><td>chop</td><td>55</td><td>no</td><td>$0.0061</td><td style="text-align:left">Price is grinding sideways in a tight ~1.3% range over the last 5 hours with RSI neutral at 52 and minimal 24h change, indicating no clear directional momentum despite bullish EMA alignment. Recent re</td></tr>
+<tr><td>2026-07-06T01:58:25.997Z</td><td>ETHUSDT</td><td>bullish</td><td>68</td><td>yes</td><td>$0.0061</td><td style="text-align:left">Price trades comfortably above all key EMAs on both 1h and 4h timeframes, RSI at 57.72 confirms healthy upward momentum without being overbought, and funding rate remains near-neutral with no crowded </td></tr>
+<tr><td>2026-07-06T01:58:20.245Z</td><td>BTCUSDT</td><td>bullish</td><td>65</td><td>yes</td><td>$0.0058</td><td style="text-align:left">Price is cleanly above all 1h and 4h EMAs with RSI at 64.8, and the 5-candle sequence shows a steady bullish climb from 62,600 to 63,588. The breakout from a prolonged chop regime with aligned EMA str</td></tr>
+<tr><td>2026-07-05T22:48:51.722Z</td><td>NEARUSDT</td><td>bullish</td><td>68</td><td>yes</td><td>$0.0062</td><td style="text-align:left">Price is trending above all 1h EMAs and the 4h e20/e50, with five consecutive higher candles and RSI at 66.5 confirming bullish momentum. The 4h EMA200 at 2.08 poses nearby resistance, but the overall</td></tr>
+<tr><td>2026-07-05T22:48:46.553Z</td><td>AVAXUSDT</td><td>bullish</td><td>65</td><td>yes</td><td>$0.0056</td><td style="text-align:left">Price holds above all key EMAs on both 1h and 4h timeframes with RSI at 59.64, reflecting intact bullish structure without overbought conditions. The last candle attempted a push to 7.01, confirming m</td></tr>
+<tr><td>2026-07-05T21:55:09.206Z</td><td>XRPUSDT</td><td>chop</td><td>30</td><td>no</td><td>$0.0061</td><td style="text-align:left">Price is locked in an extremely tight range ($1.13-$1.15) with minimal ATR (0.65%) and all 1h EMAs converged at the same level, signaling no directional momentum. RSI at 56 is neutral and the persiste</td></tr>
+</table>
+</body></html>
