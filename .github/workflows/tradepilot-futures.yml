@@ -55,6 +55,10 @@ jobs:
           # rejecting nearly every confident regime call.
           VOLUME_MIN_RATIO: ${{ vars.VOLUME_MIN_RATIO }}
           MTF_DAILY_FILTER_ENABLED: ${{ vars.MTF_DAILY_FILTER_ENABLED }}
+          # Entry-gate confidence floor (default 60). The regime prompt asks
+          # for committed 55-75 calls on aligned setups; lower this to 55 via
+          # a repo variable to make those lower-band calls tradable.
+          REGIME_MIN_CONFIDENCE: ${{ vars.REGIME_MIN_CONFIDENCE }}
           # Optional: Telegram alerts (no-op when unset).
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
