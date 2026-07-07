@@ -280,6 +280,15 @@ export async function runPairRules({
   const actions = [];
   const atIso = new Date(now).toISOString();
 
+  // Every rejected entry is persisted as a NO_ENTRY event so "why isn't it
+  // trading" is answerable from the database (and the dashboard's blockers
+  // panel) instead of from console scrollback.
+  const noEntry = (reason, direction = null) => {
+    logEvent('NO_ENTRY', { pair, reason, ...(direction ? { direction } : {}) }, db, atIso);
+    actions.push({ type: 'no_entry', pair, ...(direction ? { direction } : {}), reason });
+    return actions;
+  };
+
   // 1. Trailing stop + partial exit state machine (direction-aware).
   let position = getOpenPosition(pair, db);
   if (position) {
@@ -331,8 +340,7 @@ export async function runPairRules({
   const halted = isHalted(equity, db, cfg, now) || entriesBlocked;
   const direction = chooseDirection(regime);
   if (!direction) {
-    actions.push({ type: 'no_entry', pair, reason: 'no_directional_regime' });
-    return actions;
+    return noEntry('no_directional_regime');
   }
   const bounds = rsiBounds ?? dynamicRsiBounds(null, cfg);
   const dirBounds = direction === 'short' ? bounds.short : bounds.long;
@@ -357,8 +365,7 @@ export async function runPairRules({
     cfg,
   );
   if (!gate.ok) {
-    actions.push({ type: 'no_entry', pair, direction, reason: gate.reason });
-    return actions;
+    return noEntry(gate.reason, direction);
   }
 
   // 4. Sizing: risk-based (never leverage-based), volatility-targeted, then
@@ -366,8 +373,7 @@ export async function runPairRules({
   const sized = computePositionSize(equity, price, atr1h, cfg, regime, direction);
   let qty = sized.qty * Math.min(1, volScale);
   if (qty <= 0) {
-    actions.push({ type: 'no_entry', pair, direction, reason: 'zero_size' });
-    return actions;
+    return noEntry('zero_size', direction);
   }
 
   // 4a. Liquidation buffer: the stop must always be hit before liquidation.
@@ -389,21 +395,18 @@ export async function runPairRules({
     logEvent('LEVERAGE_EXPOSURE_CAP', {
       pair, direction, openNotional, newNotional, cap: exposureCap, leverage: cfg.leverage,
     }, db, atIso);
-    actions.push({ type: 'no_entry', pair, direction, reason: 'leverage_exposure_cap' });
-    return actions;
+    return noEntry('leverage_exposure_cap', direction);
   }
 
   // 4c. Margin pre-check (with slippage headroom), then fill.
   const estMargin = (newNotional * (1 + cfg.slippage)) / cfg.leverage;
   const estFee = newNotional * (1 + cfg.slippage) * cfg.takerFee;
   if (estMargin + estFee > getAvailableBalance(db)) {
-    actions.push({ type: 'no_entry', pair, direction, reason: 'insufficient_margin' });
-    return actions;
+    return noEntry('insufficient_margin', direction);
   }
   const fill = await executor.openPosition(pair, direction, qty, price);
   if (fill.skipped) {
-    actions.push({ type: 'no_entry', pair, direction, reason: fill.skipped });
-    return actions;
+    return noEntry(fill.skipped, direction);
   }
   const tradeQty = fill.executedQty ?? qty;
   const d = directionSign(direction);

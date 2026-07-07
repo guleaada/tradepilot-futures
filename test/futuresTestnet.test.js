@@ -146,15 +146,18 @@ test('-2019 (margin insufficient) skips the order instead of crashing the loop',
   db.close();
 });
 
-test('reconcile flags STATE_MISMATCH when the exchange wallet disagrees with local cash', async () => {
-  // local cash starts at 1000 (fresh portfolio); exchange reports 700
+test('reconcile blocks the cycle and resyncs when the exchange wallet disagrees with local cash', async () => {
+  // local cash starts at 1000 (fresh portfolio); exchange reports 700 ->
+  // adopt the exchange wallet (source of truth for money), log STATE_RESYNCED,
+  // and block entries for this cycle.
   const { ex, db } = makeExecutor({ mockOpts: { walletBalance: 700 } });
   await ex.init(['BTCUSDT', 'ETHUSDT']);
   assert.equal(await ex.reconcile(db), false);
-  const ev = db.prepare("SELECT detail FROM events WHERE type = 'STATE_MISMATCH'").get();
+  const ev = db.prepare("SELECT detail FROM events WHERE type = 'STATE_RESYNCED'").get();
   const detail = JSON.parse(ev.detail);
   assert.equal(detail.localCash, 1000);
   assert.equal(detail.exchangeWallet, 700);
+  assert.equal(db.prepare('SELECT cash FROM portfolio WHERE id = 1').get().cash, 700);
 
   // and agrees when balances match
   const { ex: ex2, db: db2 } = makeExecutor({ mockOpts: { walletBalance: 1000 } });

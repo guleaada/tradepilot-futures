@@ -240,7 +240,7 @@ async function maybeSendDailySummaryAlert(db) {
 
 async function sendEventAlerts(db, cycleStartIso) {
   const rows = db
-    .prepare("SELECT type, detail FROM events WHERE ts >= ? AND type IN ('RISK_HALT', 'REGIME_PARSE_FAILURE')")
+    .prepare("SELECT type, detail FROM events WHERE ts >= ? AND type IN ('RISK_HALT', 'REGIME_PARSE_FAILURE', 'ORPHAN_POSITION_CLOSED', 'STATE_RESYNCED')")
     .all(cycleStartIso);
   for (const row of rows) {
     await sendAlert(`⚠️ TradePilot-Futures ${row.type}: ${row.detail}`);

@@ -49,6 +49,12 @@ jobs:
           # the reconcile guard flags STATE_MISMATCH and blocks all entries.
           # (Only seeds a FRESH database; the committed DB carries its own cash.)
           START_BALANCE: ${{ vars.START_BALANCE }}
+          # Optional strategy knobs (repo variables; code defaults apply when
+          # unset). Added after day-4 gate analysis: with GitHub throttling the
+          # cron to ~10-20 cycles/day, the volume and daily-EMA filters were
+          # rejecting nearly every confident regime call.
+          VOLUME_MIN_RATIO: ${{ vars.VOLUME_MIN_RATIO }}
+          MTF_DAILY_FILTER_ENABLED: ${{ vars.MTF_DAILY_FILTER_ENABLED }}
           # Optional: Telegram alerts (no-op when unset).
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

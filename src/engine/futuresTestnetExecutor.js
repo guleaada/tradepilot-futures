@@ -15,7 +15,7 @@
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { getDb, logEvent, nowIso } from '../db.js';
-import { getCash } from './portfolio.js';
+import { getCash, getOpenPositions, setCash } from './portfolio.js';
 
 // Frozen on purpose. Do not make this configurable.
 export const FUTURES_TESTNET_BASE = 'https://testnet.binancefuture.com';
@@ -114,20 +114,56 @@ export class FuturesTestnetExecutor {
     this.timeOffset = Number(data.serverTime) - Date.now();
   }
 
-  // Compare the exchange wallet balance with local cash at cycle start. On
-  // disagreement beyond rounding: log STATE_MISMATCH and tell the caller to
-  // block new entries for this cycle. Never throws.
+  // Reconcile exchange state against local state at cycle start. Two duties:
+  //
+  //   1. ORPHAN POSITIONS: an exchange position on a managed symbol with no
+  //      local open trade means an entry filled but its bookkeeping crashed
+  //      (it happened: NaN fills on NEARUSDT left unmanaged longs with no
+  //      stop). Orphans are FLATTENED with a reduce-only market order — the
+  //      trades table is the source of truth for what we hold.
+  //   2. WALLET DRIFT: beyond tolerance, adopt the exchange wallet as local
+  //      cash (the exchange is the source of truth for money), log
+  //      STATE_RESYNCED loudly, and still block entries for this cycle.
+  //
+  // Returns true when nothing needed fixing. Never throws.
   async reconcile(db = this.db) {
     try {
       const account = await this.#signed('GET', '/fapi/v2/account', {});
+
+      const localOpen = new Set(getOpenPositions(db).map((p) => p.pair));
+      let flattened = 0;
+      for (const pos of account.positions || []) {
+        const amt = Number(pos.positionAmt);
+        if (!amt || localOpen.has(pos.symbol) || !this.filters[pos.symbol]) continue;
+        try {
+          const order = await this.#signed('POST', '/fapi/v1/order', {
+            symbol: pos.symbol,
+            side: amt > 0 ? 'SELL' : 'BUY',
+            type: 'MARKET',
+            quantity: String(Math.abs(amt)),
+            reduceOnly: 'true',
+            newOrderRespType: 'RESULT',
+          });
+          flattened += 1;
+          logEvent('ORPHAN_POSITION_CLOSED', { symbol: pos.symbol, positionAmt: amt, orderId: order.orderId ?? null }, db);
+        } catch (err) {
+          logEvent('ORPHAN_POSITION_CLOSE_FAILED', { symbol: pos.symbol, positionAmt: amt, error: String(err).slice(0, 200) }, db);
+        }
+      }
+
       const wallet = Number(account.totalWalletBalance ?? NaN);
       const local = getCash(db);
       const tolerance = Math.max(1, local * 0.005);
-      if (!Number.isFinite(wallet) || Math.abs(wallet - local) > tolerance) {
+      if (!Number.isFinite(wallet)) {
         logEvent('STATE_MISMATCH', { localCash: local, exchangeWallet: wallet }, db);
         return false;
       }
-      return true;
+      if (Math.abs(wallet - local) > tolerance) {
+        setCash(wallet, db);
+        logEvent('STATE_RESYNCED', { localCash: local, exchangeWallet: wallet }, db);
+        return false;
+      }
+      return flattened === 0;
     } catch (err) {
       logEvent('STATE_MISMATCH', { error: String(err).slice(0, 300) }, db);
       return false;
@@ -180,13 +216,18 @@ export class FuturesTestnetExecutor {
       throw err;
     }
 
-    // Actual fill data from the response — not our signal price. The futures
-    // RESULT response carries avgPrice/executedQty/cumQuote directly.
+    // Actual fill data from the response — not our signal price. CAUTION: the
+    // futures TESTNET omits avgPrice/cumQuote from RESULT responses (mainnet
+    // includes them; discovered live via NaN fills on NEARUSDT). Derive the
+    // fill price defensively — quote, then avgPrice, then the signal price —
+    // and never let a non-finite number into the books; the raw response is
+    // preserved in the orders table either way.
     const executedQty = Number(data.executedQty);
     const quote = Number(data.cumQuote);
-    const fillPrice = Number(data.avgPrice) > 0
-      ? Number(data.avgPrice)
-      : executedQty > 0 ? quote / executedQty : signalPrice;
+    let fillPrice = Number(data.avgPrice);
+    if (!(fillPrice > 0)) {
+      fillPrice = quote > 0 && executedQty > 0 ? quote / executedQty : signalPrice;
+    }
     // The order response does not itemize commission; charge the taker rate
     // on the filled notional (USD-M taker is 0.04%).
     const fee = (quote > 0 ? quote : executedQty * fillPrice) * config.takerFee;
@@ -282,6 +323,11 @@ export function createMockFuturesFetch({
   walletBalance = 1000,
   failFirstOrderWith = null, // e.g. { code: -1021, msg: 'Timestamp outside recvWindow' }
   marginTypeAlreadySet = false, // respond -4046 to POST /fapi/v1/marginType
+  // Reproduce the REAL testnet's RESULT shape, which omits avgPrice/cumQuote
+  // (only price:"0.0000" + cumQty). The default keeps the documented mainnet
+  // shape; tests flip this to lock the NaN-fill regression.
+  omitAvgPrice = false,
+  positions = [], // /fapi/v2/account positions, e.g. [{ symbol, positionAmt }]
 } = {}) {
   let nextOrderId = 5000;
   let pendingFailure = failFirstOrderWith;
@@ -327,7 +373,11 @@ export function createMockFuturesFetch({
     }
     if (u.pathname === '/fapi/v2/account') {
       counters.account += 1;
-      return json({ totalWalletBalance: String(walletBalance), availableBalance: String(walletBalance), positions: [] });
+      return json({
+        totalWalletBalance: String(walletBalance),
+        availableBalance: String(walletBalance),
+        positions: positions.map((p) => ({ symbol: p.symbol, positionAmt: String(p.positionAmt), entryPrice: String(p.entryPrice ?? 0) })),
+      });
     }
     if (u.pathname === '/fapi/v1/order' && method === 'POST') {
       counters.order += 1;
@@ -340,16 +390,17 @@ export function createMockFuturesFetch({
       const side = u.searchParams.get('side');
       const qty = Number(u.searchParams.get('quantity'));
       const price = prices[symbol];
-      return json({
+      const base = {
         symbol,
         orderId: nextOrderId++,
         status: 'FILLED',
         side,
-        avgPrice: String(price),
         executedQty: String(qty),
-        cumQuote: String(qty * price),
         reduceOnly: u.searchParams.get('reduceOnly') === 'true',
-      });
+      };
+      return json(omitAvgPrice
+        ? { ...base, price: '0.0000', cumQty: String(qty) } // real-testnet shape
+        : { ...base, avgPrice: String(price), cumQuote: String(qty * price) });
     }
     return json({ code: -1100, msg: `mock: unhandled ${method} ${u.pathname}` }, 400);
   };

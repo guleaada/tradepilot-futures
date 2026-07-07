@@ -25,6 +25,11 @@ export function getCash(db = getDb()) {
 }
 
 export function setCash(cash, db = getDb()) {
+  // Defense in depth: better-sqlite3 binds NaN as NULL, which would trip the
+  // NOT NULL constraint with an opaque error AFTER an exchange order already
+  // filled. Fail loud and early instead — a non-finite wallet is always a
+  // fill-parsing bug upstream.
+  if (!Number.isFinite(cash)) throw new Error(`refusing to write non-finite cash: ${cash}`);
   db.prepare('UPDATE portfolio SET cash = ? WHERE id = 1').run(cash);
 }
 
