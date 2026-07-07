@@ -149,6 +149,17 @@ export const config = {
   partialExitFraction: num(process.env.PARTIAL_EXIT_FRACTION, 0.5),
   extendedTpR: num(process.env.EXTENDED_TP_R, 4.0),
 
+  // --- chandelier ATR trailing stop (profit lever) ---
+  // Once the trade is past breakeven (trailing armed), ratchet the stop to
+  // follow the high-water mark by trailingAtrMult x ATR. The stop only ever
+  // tightens, never loosens — so a strong trend keeps running toward its
+  // (dynamic) TP while a reversal is caught near the peak instead of falling
+  // all the way back to breakeven. Pairs with the dynamic take-profit: wide
+  // targets to let winners run, a trailing floor to bank the gains. Off =
+  // prior fixed-stop-at-breakeven behavior exactly.
+  trailingAtrEnabled: process.env.TRAILING_ATR_ENABLED !== 'false',
+  trailingAtrMult: num(process.env.TRAILING_ATR_MULT, 2.0),
+
   // --- regime-dependent risk sizing (direction-aware) ---
   regimeRiskScalingEnabled: process.env.REGIME_RISK_SCALING_ENABLED !== 'false',
   riskPctHighConf: num(process.env.RISK_PCT_HIGH_CONF, 0.015),

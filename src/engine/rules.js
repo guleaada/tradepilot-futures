@@ -195,6 +195,29 @@ export function trailingStopActions(position, price, cfg = config) {
   return actions;
 }
 
+// Chandelier ATR trailing stop. Pure. Only arms once the trade is past
+// breakeven (trailing_stop_active), so the fixed 1.5x-ATR stop protects the
+// trade before then. Tracks a high-water mark (highest price for a long,
+// lowest for a short) and trails the stop trailingAtrMult x ATR behind it.
+// The stop RATCHETS: it only ever moves in the favorable direction, never
+// loosens. Returns { newHwm, newStop } when the stop should tighten, or just
+// { newHwm } when only the high-water mark advanced, or null when inactive.
+export function chandelierStop(position, price, atr, cfg = config) {
+  if (!cfg.trailingAtrEnabled) return null;
+  if (!position.trailing_stop_active) return null; // pre-breakeven: fixed stop rules
+  if (!(atr > 0) || !(price > 0)) return null;
+  const d = directionSign(position.direction);
+  const hwm = position.hwm ?? position.entry_price;
+  const newHwm = d > 0 ? Math.max(hwm, price) : Math.min(hwm, price);
+  const candidate = newHwm - d * cfg.trailingAtrMult * atr;
+  // Ratchet: tighten only. For a long the stop may only rise; for a short,
+  // only fall. d*(candidate - stop) > 0 captures both directions.
+  if (d * (candidate - position.stop_price) > 0) {
+    return { newHwm, newStop: candidate };
+  }
+  return { newHwm };
+}
+
 // All entry conditions in one place, direction-aware. Returns { ok, reason }.
 // Long: bullish regime, price ABOVE the 4h EMA50 (and daily EMA50), RSI in
 // the long band. Short: bearish regime, price BELOW the 4h EMA50 (and daily
@@ -312,6 +335,23 @@ export async function runPairRules({
       }
     }
     position = getOpenPosition(pair, db); // refresh after state changes
+  }
+
+  // 1b. Chandelier ATR trailing stop: once armed, advance the high-water mark
+  // and ratchet the stop toward it. Runs BEFORE the exit check so a stop that
+  // just tightened past the current price fires this same cycle.
+  if (position) {
+    const trail = chandelierStop(position, price, atr1h, cfg);
+    if (trail) {
+      if (trail.newStop !== undefined) {
+        db.prepare('UPDATE trades SET stop_price = ?, hwm = ? WHERE id = ?').run(trail.newStop, trail.newHwm, position.id);
+        logEvent('TRAILING_STOP_MOVED', { pair, tradeId: position.id, direction: position.direction, newStop: trail.newStop, hwm: trail.newHwm }, db, atIso);
+        actions.push({ type: 'trail', pair, newStop: trail.newStop, hwm: trail.newHwm });
+      } else if (trail.newHwm !== (position.hwm ?? position.entry_price)) {
+        db.prepare('UPDATE trades SET hwm = ? WHERE id = ?').run(trail.newHwm, position.id);
+      }
+      position = getOpenPosition(pair, db); // refresh so the exit check sees the trailed stop
+    }
   }
 
   // 2. Exits — checked every cycle against live price.

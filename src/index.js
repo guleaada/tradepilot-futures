@@ -275,10 +275,25 @@ export async function runCycle(db = getDb()) {
 
   await maybeSendDailySummaryAlert(db);
 
-  // A cycle that evaluates zero pairs must never look like a healthy cycle.
+  // A pair holding an OPEN position must ALWAYS be managed (stop/TP/trailing/
+  // exit), even if it just dropped below the liquidity threshold and fell out
+  // of activePairs — otherwise a filtered-out position is stranded with no
+  // stop until the pair regains liquidity, which on leverage can mean
+  // liquidation. Liquidity gates NEW entries only (enforced per-pair below);
+  // it must never gate exits on money already at risk.
+  const openPairs = getOpenPositions(db).map((p) => p.pair);
+  const liquidSet = new Set(activePairs);
+  const managedPairs = [...new Set([...activePairs, ...openPairs])];
+  const strandedManaged = openPairs.filter((p) => !liquidSet.has(p));
+  if (strandedManaged.length) {
+    logEvent('MANAGING_ILLIQUID_POSITION', { pairs: strandedManaged }, db);
+    console.warn(`managing open positions on liquidity-filtered pairs (exits only): ${strandedManaged.join(', ')}`);
+  }
+
+  // A cycle that manages zero pairs must never look like a healthy cycle.
   // The event is logged every cycle; the alert is throttled to once per UTC
   // day so a persistent empty universe can't spam Telegram forever.
-  if (activePairs.length === 0) {
+  if (managedPairs.length === 0) {
     logEvent('NO_ACTIVE_PAIRS', { configuredPairs: config.pairs }, db);
     const today = new Date().toISOString().slice(0, 10);
     const alreadyAlerted = db
@@ -300,9 +315,9 @@ export async function runCycle(db = getDb()) {
     if (entriesBlocked) console.warn('STATE_MISMATCH: blocking new entries this cycle (see events table)');
   }
 
-  // Phase 1: load market data for every active pair (needed up front so the
+  // Phase 1: load market data for every managed pair (needed up front so the
   // correlation filter and BTC dominance can see all pairs at once).
-  for (const pair of activePairs) {
+  for (const pair of managedPairs) {
     try {
       markets[pair] = await loadMarket(pair);
       prices[pair] = markets[pair].price;
@@ -326,9 +341,12 @@ export async function runCycle(db = getDb()) {
   if (volScale < 1) console.log(`volatility targeting: scaling new positions by ${volScale.toFixed(2)}`);
 
   // Phase 2: AI opinions + deterministic rules per pair.
-  for (const pair of activePairs) {
+  for (const pair of managedPairs) {
     const market = markets[pair];
     if (!market) continue;
+    // Illiquid pairs that are only in the managed set to close an existing
+    // position: manage exits, but never open a new entry on them.
+    const pairEntriesBlocked = entriesBlocked || !liquidSet.has(pair);
     try {
       const stats7d = trailing7dStats(db);
       const context = {
@@ -359,7 +377,7 @@ export async function runCycle(db = getDb()) {
         executor,
         db,
         prices,
-        entriesBlocked,
+        entriesBlocked: pairEntriesBlocked,
         volScale,
       });
       for (const a of actions) {
@@ -381,6 +399,8 @@ export async function runCycle(db = getDb()) {
           await sendAlert(`🟡 PARTIAL EXIT ${a.direction.toUpperCase()} ${pair} closed ${a.closedQty.toFixed(6)} P&L $${a.partialPnl.toFixed(2)} | remainder TP ${a.newTp.toFixed(2)}`);
         } else if (a.type === 'breakeven') {
           console.log(`[${pair}] STOP -> BREAKEVEN at ${a.newStop.toFixed(2)}`);
+        } else if (a.type === 'trail') {
+          console.log(`[${pair}] TRAILING STOP -> ${a.newStop.toFixed(4)} (hwm ${a.hwm.toFixed(4)})`);
         } else if (a.type === 'exit_skipped') {
           console.log(`[${pair}] EXIT SKIPPED (${a.reason}) — position stays open, retrying next cycle`);
         } else {

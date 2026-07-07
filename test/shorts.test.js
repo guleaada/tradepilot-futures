@@ -166,14 +166,17 @@ test('leverage-exposure cap blocks entries past half the leveraged buying power'
   db.close();
 });
 
-test('short trailing sequence: breakeven, partial, extended tp — all mirrored down', async () => {
+test('short trailing sequence: breakeven, partial, chandelier trail — all mirrored down', async () => {
   const db = openDb(':memory:');
-  await runPairRules({ ...shortSetup, regime: bearish, db }); // short 1.667 @ 100, R=6
-  // price falls 2R to 88: breakeven + partial in one move
+  await runPairRules({ ...shortSetup, regime: bearish, db }); // short 1.667 @ 100, R=6, ATR 4
+  // price falls 2R to 88: breakeven + partial arm trailing, then the
+  // chandelier ratchets the stop down toward the low-water mark the same cycle
   const actions = await runPairRules({ ...shortSetup, price: 88, regime: bearish, db });
-  assert.deepEqual(actions.filter((a) => a.type !== 'no_entry').map((a) => a.type), ['breakeven', 'partial_exit']);
+  assert.deepEqual(actions.filter((a) => a.type !== 'no_entry').map((a) => a.type), ['breakeven', 'partial_exit', 'trail']);
   const pos = getOpenPosition('SOLUSDT', db);
-  assert.equal(pos.stop_price, 100, 'stop moved down-to... entry (breakeven)');
+  // chandelier: lwm 88 + 2*ATR(4) = 96 -> tighter than the breakeven stop 100
+  assert.ok(Math.abs(pos.stop_price - 96) < 1e-9, 'stop trailed to 96 (2xATR above the low), below breakeven');
+  assert.equal(pos.hwm, 88, 'low-water mark tracked');
   assert.ok(Math.abs(pos.tp_price - 76) < 1e-9, 'runner targets entry - 4R');
   assert.ok(Math.abs(pos.qty - (10 / 6) * 0.5) < 1e-9, 'half closed');
   const partial = actions.find((a) => a.type === 'partial_exit');

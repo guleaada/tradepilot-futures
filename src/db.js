@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS trades (
   funding_paid         REAL DEFAULT 0,
   last_funding_ts      TEXT,
   trend_class          TEXT,
-  tp_mult              REAL
+  tp_mult              REAL,
+  hwm                  REAL
 );
 
 CREATE TABLE IF NOT EXISTS regime_accuracy (
@@ -152,6 +153,7 @@ function migrateTrades(db) {
   add('entry_qty', 'entry_qty REAL');
   add('trend_class', 'trend_class TEXT'); // dynamic-TP trend class at entry
   add('tp_mult', 'tp_mult REAL'); // ATR multiple used for this trade's TP
+  add('hwm', 'hwm REAL'); // high-water mark price for the chandelier trailing stop
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (orderCols.length && !orderCols.includes('direction')) {
     db.exec('ALTER TABLE orders ADD COLUMN direction TEXT');

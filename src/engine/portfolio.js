@@ -96,8 +96,8 @@ export function openTrade(
         `INSERT INTO trades
            (pair, direction, status, entry_time, entry_price, qty, stop_price, tp_price, entry_fee,
             entry_order_id, initial_risk, regime_at_entry, confidence_at_entry, entry_qty,
-            leverage, margin, funding_paid, trend_class, tp_mult)
-         VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+            leverage, margin, funding_paid, trend_class, tp_mult, hwm)
+         VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       )
       .run(
         pair, direction, at, fillPrice, qty, stopPrice, tpPrice, fee,
@@ -107,6 +107,7 @@ export function openTrade(
         qty, // original entry quantity, fixed for the life of the trade
         leverage, margin,
         trendClass, tpMult, // dynamic-TP class + ATR multiple, frozen at entry
+        fillPrice, // hwm seeds at entry; the chandelier trail tracks it once armed
       );
     return info.lastInsertRowid;
   });
