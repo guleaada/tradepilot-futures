@@ -7,6 +7,7 @@
 // public mirror). Funding comes from the futures premiumIndex endpoint. Mock
 // data gains per-pair TRENDS so demo cycles can open both longs and shorts.
 import { config } from '../config.js';
+import { isMetal } from '../engine/rules.js';
 
 const cache = new Map(); // url -> { ts, data }
 
@@ -86,8 +87,35 @@ function parseKline(k) {
   };
 }
 
+// Metals (XAU/XAG) have NO Binance spot market — their data must come from
+// the futures venues: mainnet fapi first (real market data; geo-blocked on
+// CI runners), futures TESTNET fapi as the reachable fallback. Testnet
+// prices track the index nearly tick-for-tick; its volumes are play-money
+// but the volume filter is self-relative (ratio to the pair's own average),
+// so it still functions. Crypto pairs keep the spot pipeline untouched.
+const FUTURES_DATA_HOSTS = [
+  () => config.binanceFapiBase,
+  () => 'https://testnet.binancefuture.com',
+];
+
+async function fetchFapiData(path, opts = {}) {
+  let lastErr;
+  for (const host of FUTURES_DATA_HOSTS) {
+    try {
+      return await fetchJson(`${host()}${path}`, { maxAttempts: 2, ...opts });
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error(`all futures data hosts failed for ${path}`);
+}
+
 export async function getKlines(pair, interval, limit = config.klineLimit, { ttl } = {}) {
   if (config.mock) return mockKlines(pair, interval, limit);
+  if (isMetal(pair)) {
+    const raw = await fetchFapiData(`/fapi/v1/klines?symbol=${pair}&interval=${interval}&limit=${limit}`, { ttl });
+    return raw.map(parseKline);
+  }
   const raw = await fetchSpot(`/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`, { ttl });
   return raw.map(parseKline);
 }
@@ -99,7 +127,10 @@ export async function getDailyKlines(pair, limit = config.klineLimit) {
 
 export async function getTicker24h(pair) {
   if (config.mock) return mockTicker(pair);
-  const raw = await fetchSpot(`/api/v3/ticker/24hr?symbol=${pair}`);
+  // No spot market for metals: /api/v3/ticker/24hr returns -1121 for them.
+  const raw = isMetal(pair)
+    ? await fetchFapiData(`/fapi/v1/ticker/24hr?symbol=${pair}`)
+    : await fetchSpot(`/api/v3/ticker/24hr?symbol=${pair}`);
   return {
     lastPrice: Number(raw.lastPrice),
     priceChangePercent: Number(raw.priceChangePercent),
@@ -129,7 +160,20 @@ export async function getFuturesTicker24h(pair) {
         source: 'futures',
       };
     }
-  } catch { /* geo-block or outage: fall through to the spot proxy */ }
+  } catch { /* geo-block or outage: fall through */ }
+  // Metals have no spot market to proxy from; use the futures-testnet ticker
+  // instead (its metals turnover comfortably clears the liquidity floor).
+  // Crypto keeps the spot-volume proxy: real liquidity, just another venue.
+  if (isMetal(pair)) {
+    const raw = await fetchFapiData(`/fapi/v1/ticker/24hr?symbol=${pair}`);
+    return {
+      lastPrice: Number(raw.lastPrice),
+      priceChangePercent: Number(raw.priceChangePercent),
+      volume: Number(raw.volume),
+      quoteVolume: Number(raw.quoteVolume),
+      source: 'futures_testnet',
+    };
+  }
   return { ...(await getTicker24h(pair)), source: 'spot_proxy' };
 }
 

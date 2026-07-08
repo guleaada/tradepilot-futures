@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { config } from '../src/config.js';
 import { openDb } from '../src/db.js';
-import { getFuturesTicker24h } from '../src/data/binance.js';
+import { getFuturesTicker24h, getKlines } from '../src/data/binance.js';
 import {
   computePositionSize,
   entryAllowed,
@@ -115,6 +115,33 @@ test('a crypto entry is byte-identical to pre-metals behavior', async () => {
   const rr = (open.tp - open.entry) / (open.entry - open.stop);
   assert.ok(Math.abs(rr - 3.0) < 1e-9, 'same 3R reward:risk as the gold entry');
   db.close();
+});
+
+test('metals klines route to futures venues; crypto stays on spot (no spot market for XAU/XAG)', async () => {
+  const origFetch = globalThis.fetch;
+  const origMock = config.mock;
+  config.mock = false;
+  const urls = [];
+  const kline = [[0, '1', '2', '0.5', '1.5', '100', 1, '150', 10, '50', '75', '0']];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return new Response(JSON.stringify(kline), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const gold = await getKlines('XAUUSDT', '1h', 1, { ttl: 0 });
+    assert.equal(gold.length, 1);
+    assert.equal(gold[0].close, 1.5);
+    assert.ok(urls.some((u) => u.includes('/fapi/v1/klines') && u.includes('XAUUSDT')), 'gold hits fapi klines');
+    assert.ok(!urls.some((u) => u.includes('/api/v3/')), 'gold never touches the spot API');
+
+    urls.length = 0;
+    await getKlines('BTCUSDT', '1h', 1, { ttl: 0 });
+    assert.ok(urls.some((u) => u.includes('/api/v3/klines') && u.includes('BTCUSDT')), 'crypto still reads spot klines');
+    assert.ok(!urls.some((u) => u.includes('/fapi/')), 'crypto klines never hit fapi');
+  } finally {
+    globalThis.fetch = origFetch;
+    config.mock = origMock;
+  }
 });
 
 test('mock liquidity filter keeps gold and silver in the universe', async () => {
