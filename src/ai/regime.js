@@ -29,6 +29,8 @@ const SYSTEM_PROMPT = [
   'You receive a compact JSON market summary for one trading pair.',
   'Classify the current regime and decide whether the deterministic rule engine should be allowed to trade.',
   'A confident bearish call enables short entries — it is a directional opinion, not just a risk-off flag.',
+  'Some pairs are precious metals (gold XAUUSDT, silver XAGUSDT). Metals are macro-driven, trend more smoothly than crypto, and are often uncorrelated with it — treat a clean metals trend as high-conviction.',
+  'For metals especially, favor trend continuation over counter-trend calls; their reversals are slower and cleaner than crypto\'s.',
   'Goal: commit to a clear directional call whenever the evidence genuinely supports one. Do not retreat to "chop" out of excess caution when momentum, RSI, volume, and EMA alignment actually agree on a direction — a moderate-but-real edge is tradable.',
   'When indicators align on a direction with decent momentum, lean bullish or bearish with confidence 55-75 rather than defaulting to chop.',
   'But "chop" remains the honest answer in true sideways, conflicting, or low-conviction conditions. Never manufacture a signal that is not there — a forced trade is worse than no trade.',

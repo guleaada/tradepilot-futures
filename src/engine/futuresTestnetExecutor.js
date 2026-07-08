@@ -319,6 +319,7 @@ export function createMockFuturesFetch({
     BTCUSDT: 66900, ETHUSDT: 2670, BNBUSDT: 522,
     AVAXUSDT: 33.6, LINKUSDT: 13.2, ARBUSDT: 0.9, INJUSDT: 22,
     SUIUSDT: 3.36, DOGEUSDT: 0.106, NEARUSDT: 5.6, LTCUSDT: 88,
+    XAUUSDT: 2912, XAGUSDT: 26.4,
   },
   walletBalance = 1000,
   failFirstOrderWith = null, // e.g. { code: -1021, msg: 'Timestamp outside recvWindow' }

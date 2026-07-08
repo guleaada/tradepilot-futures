@@ -50,10 +50,15 @@ export const config = {
   // (higher trade frequency), NOT more concurrent risk. The liquidity filter
   // below self-prunes anything too thin per run (futures 24h quote volume,
   // spot volume as the proxy where the futures endpoint is geo-blocked).
+  // Metals (gold/silver perps): macro-driven, smoother trends, often
+  // uncorrelated with crypto. XPTUSDT (platinum) is deliberately absent —
+  // its liquidity flaps around the filter threshold and fills poorly at
+  // leverage.
   pairs: list(process.env.PAIRS, [
     'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
     'AVAXUSDT', 'LINKUSDT', 'APTUSDT', 'ARBUSDT', 'INJUSDT',
     'SUIUSDT', 'TIAUSDT', 'DOGEUSDT', 'NEARUSDT', 'LTCUSDT',
+    'XAUUSDT', 'XAGUSDT',
   ]),
   liquidityMinVolume24h: num(process.env.LIQUIDITY_MIN_VOLUME_24H, 10_000_000),
   binanceBase: process.env.BINANCE_BASE || 'https://api.binance.com',
@@ -107,6 +112,15 @@ export const config = {
   riskPerTrade: num(process.env.RISK_PER_TRADE, 0.01),
   stopAtrMult: num(process.env.STOP_ATR_MULT, 1.5),
   tpAtrMult: num(process.env.TP_ATR_MULT, 2.5),
+
+  // --- metals-specific rules (XAU/XAG only; crypto pairs are untouched) ---
+  // Wider stop suits metals' smoother trends and avoids getting wicked out of
+  // good positions; the TP scales off the same R so reward:risk is preserved.
+  metalsStopAtrMult: num(process.env.METALS_STOP_ATR_MULT, 1.8),
+  // Metals reward trend-continuation and punish counter-trend chop: demand a
+  // real trend (ADX-14 on 4h) before a metals entry. Missing ADX fails the
+  // gate for metals — no trend reading means no metals trade.
+  metalsMinAdx: num(process.env.METALS_MIN_ADX, 22),
 
   // --- trend-scaled dynamic take-profit ---
   // TP distance scales with trend strength (ADX-14 on the 4h candles — same

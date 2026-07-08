@@ -162,6 +162,7 @@ const MOCK_BASE = {
   BTCUSDT: 60000, ETHUSDT: 3000, SOLUSDT: 150, BNBUSDT: 600, XRPUSDT: 0.5,
   AVAXUSDT: 30, LINKUSDT: 15, APTUSDT: 9, ARBUSDT: 0.8, INJUSDT: 25,
   SUIUSDT: 3, TIAUSDT: 5, DOGEUSDT: 0.12, NEARUSDT: 5, LTCUSDT: 100,
+  XAUUSDT: 2600, XAGUSDT: 30,
 };
 // Distinct oscillation phases per pair so mock pairs are not perfectly
 // correlated (lets the correlation filter behave realistically in demos).
@@ -171,6 +172,7 @@ const MOCK_PHASE = {
   BTCUSDT: 0, ETHUSDT: 2.8, SOLUSDT: 3.1, BNBUSDT: 4.7, XRPUSDT: 0.8,
   AVAXUSDT: 1.2, LINKUSDT: 2.1, APTUSDT: 3.9, ARBUSDT: 5.3, INJUSDT: 0.4,
   SUIUSDT: 1.9, TIAUSDT: 2.5, DOGEUSDT: 3.4, NEARUSDT: 4.2, LTCUSDT: 5.8,
+  XAUUSDT: 1.4, XAGUSDT: 0.8,
 };
 // Per-pair trend direction: +1 uptrend (long candidate), -1 downtrend (short
 // candidate). BTC long + ETH short is the canonical mock A/B demo pair-up.
@@ -178,6 +180,7 @@ const MOCK_TREND = {
   BTCUSDT: 1, ETHUSDT: -1, SOLUSDT: 1, BNBUSDT: -1, XRPUSDT: 1,
   AVAXUSDT: 1, LINKUSDT: -1, APTUSDT: 1, ARBUSDT: 1, INJUSDT: -1,
   SUIUSDT: 1, TIAUSDT: -1, DOGEUSDT: -1, NEARUSDT: 1, LTCUSDT: -1,
+  XAUUSDT: 1, XAGUSDT: -1,
 };
 // Explicit mock 24h quote volumes (USD) for the expanded pairs. APT and TIA
 // sit deliberately BELOW the $10M threshold — together with SOL/XRP (derived
@@ -189,6 +192,8 @@ const MOCK_QUOTE_VOL = {
   ARBUSDT: 25_000_000, INJUSDT: 18_000_000, SUIUSDT: 22_000_000,
   TIAUSDT: 4_000_000, DOGEUSDT: 30_000_000, NEARUSDT: 15_000_000,
   LTCUSDT: 12_000_000,
+  // Metals clear the $10M filter comfortably (gold especially).
+  XAUUSDT: 45_000_000, XAGUSDT: 15_000_000,
 };
 
 export function mockTrend(pair) {

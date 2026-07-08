@@ -22,6 +22,22 @@ import {
 
 // --- pure functions (unit-tested) ---
 
+// Precious-metals perps (XPTUSDT deliberately excluded: liquidity flaps
+// around the filter threshold and fills poorly at leverage). Metals trend
+// more smoothly than crypto, so they get a wider stop and demand a real
+// trend (ADX floor) — everything else (1% risk, liquidation buffer, halts,
+// leverage cap, cooldown) applies identically.
+export function isMetal(pair) {
+  return ['XAUUSDT', 'XAGUSDT'].includes(pair);
+}
+
+// Stop multiple for a pair: metals ride wider (1.8x ATR by default) so
+// ordinary wicks don't shake out good trend positions. Crypto pairs keep the
+// plain stopAtrMult — byte-identical to the pre-metals behavior.
+export function stopMultFor(pair, cfg = config) {
+  return pair && isMetal(pair) ? cfg.metalsStopAtrMult : cfg.stopAtrMult;
+}
+
 // The regime maps to at most one tradable direction. Chop (or anything
 // unknown) trades nothing.
 export function chooseDirection(regime) {
@@ -35,9 +51,10 @@ export function chooseDirection(regime) {
 // direction at confidence >= highConfThreshold and scaling is enabled). Size
 // derives from the ATR stop distance — NEVER from leverage; leverage only
 // affects the margin the position locks. Notional capped at 25% (30%
-// high-confidence).
-export function computePositionSize(equity, price, atrValue, cfg = config, regime = null, direction = 'long') {
-  const stopDist = cfg.stopAtrMult * atrValue;
+// high-confidence). `pair` widens the stop for metals; sizing shrinks
+// accordingly so the dollar risk stays exactly 1%.
+export function computePositionSize(equity, price, atrValue, cfg = config, regime = null, direction = 'long', pair = null) {
+  const stopDist = stopMultFor(pair, cfg) * atrValue;
   if (!(stopDist > 0) || !(price > 0) || !(equity > 0)) {
     return { qty: 0, stopDist: 0, notional: 0, capped: false, riskPct: cfg.riskPerTrade };
   }
@@ -226,7 +243,7 @@ export function entryAllowed(input, cfg = config) {
   const {
     direction, regime, price, ema50_4h, dailyEma50, rsi1h,
     volumeRatio, correlationBlocked, weekendBlocked,
-    hasOpen, openCount, inCooldown, halted,
+    hasOpen, openCount, inCooldown, halted, pair, adx4h,
   } = input;
   const isShort = direction === 'short';
   const rsiMin = input.rsiMin ?? (isShort ? cfg.rsiShortEntryMin : cfg.rsiEntryMin);
@@ -245,6 +262,12 @@ export function entryAllowed(input, cfg = config) {
   if (!regime || regime.regime !== requiredRegime) return fail(`regime_not_${requiredRegime}`);
   if (!regime.trade_allowed) return fail('trade_not_allowed');
   if (regime.confidence < cfg.regimeMinConfidence) return fail('low_confidence');
+  // Metals reward trend-continuation and punish counter-trend chop: demand a
+  // real trend before entering. A missing ADX reading fails the gate for
+  // metals — no trend evidence, no metals trade. Crypto pairs skip this.
+  if (pair && isMetal(pair) && (!Number.isFinite(adx4h) || adx4h < cfg.metalsMinAdx)) {
+    return fail('metals_weak_trend');
+  }
   const d = isShort ? -1 : 1;
   if (ema50_4h === null || ema50_4h === undefined || !(d * (price - ema50_4h) > 0)) {
     return fail(isShort ? 'above_ema50_4h' : 'below_ema50_4h');
@@ -392,6 +415,8 @@ export async function runPairRules({
       ema50_4h,
       dailyEma50,
       rsi1h,
+      pair,
+      adx4h,
       rsiMin: dirBounds.min,
       rsiMax: dirBounds.max,
       volumeRatio,
@@ -410,7 +435,7 @@ export async function runPairRules({
 
   // 4. Sizing: risk-based (never leverage-based), volatility-targeted, then
   //    the liquidation buffer and the leverage-exposure cap.
-  const sized = computePositionSize(equity, price, atr1h, cfg, regime, direction);
+  const sized = computePositionSize(equity, price, atr1h, cfg, regime, direction, pair);
   let qty = sized.qty * Math.min(1, volScale);
   if (qty <= 0) {
     return noEntry('zero_size', direction);
@@ -453,7 +478,11 @@ export async function runPairRules({
   const stopPrice = fill.fillPrice - d * sized.stopDist; // stop distance NEVER scales with trend
   const trendClass = classifyTrend(adx4h, cfg);
   const tpMult = tpMultiplierFor(trendClass, cfg);
-  const tpPrice = fill.fillPrice + d * tpMult * atr1h;
+  // TP scales off the same R as the stop: for metals (wider 1.8x-ATR stop)
+  // the TP distance stretches by the same ratio, preserving reward:risk.
+  // Crypto pairs have ratio 1 — byte-identical to before.
+  const rScale = stopMultFor(pair, cfg) / cfg.stopAtrMult;
+  const tpPrice = fill.fillPrice + d * tpMult * atr1h * rScale;
   const tradeId = openTrade(
     {
       pair, direction, qty: tradeQty, fillPrice: fill.fillPrice, fee: fill.fee, stopPrice, tpPrice,

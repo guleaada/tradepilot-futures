@@ -197,8 +197,9 @@ test('mock liquidity data prunes the deliberately-thin expanded pairs', async ()
   config.mock = true; // getFuturesTicker24h serves the deterministic mock tickers
   try {
     const kept = await filterPairsByLiquidity(db, { getTicker24h: getFuturesTicker24h });
-    // 15 configured; SOL/XRP (derived volumes) and APT/TIA (explicit) are thin
-    assert.equal(config.pairs.length, 15);
+    // 17 configured (15 crypto + gold/silver); SOL/XRP (derived volumes) and
+    // APT/TIA (explicit) are thin
+    assert.equal(config.pairs.length, 17);
     assert.deepEqual(
       kept,
       config.pairs.filter((p) => !['SOLUSDT', 'XRPUSDT', 'APTUSDT', 'TIAUSDT'].includes(p)),
