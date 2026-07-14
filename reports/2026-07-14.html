@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>TradePilot-Futures 2026-07-14</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; font-size: 13px; text-align: right; }
+  th { background: #f3f4f6; }
+  td:first-child, th:first-child { text-align: left; }
+  .neg { color: #dc2626; } .pos { color: #16a34a; }
+  h2 { margin-top: 2rem; }
+  .banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 6px; }
+</style></head><body>
+<h1>TradePilot-Futures — Daily Report 2026-07-14</h1>
+<p class="banner"><strong>EXECUTOR: FUTURES TESTNET (3x leverage)</strong> — Binance USD-M futures testnet, isolated margin, long + short. <strong>No real funds.</strong> Mainnet futures trading is intentionally not implemented. Runs in parallel with the spot TradePilot for a 30-day A/B comparison.</p>
+
+<h2>Equity curve</h2>
+<svg width="720" height="220" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="220" fill="#fafafa" stroke="#ddd"/>
+  <text x="36" y="18" font-family="monospace" font-size="12">max 5001.43</text>
+  <text x="36" y="212" font-family="monospace" font-size="12">min 4801.35</text>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2" points="36.0,37.1 41.9,37.1 47.8,37.1 53.7,37.1 59.6,37.1 65.5,37.1 71.3,37.1 77.2,37.1 83.1,37.1 89.0,37.1 94.9,37.1 100.8,37.1 106.7,37.1 112.6,37.1 118.5,37.1 124.4,37.1 130.3,37.1 136.1,37.1 142.0,37.1 147.9,37.1 153.8,37.1 159.7,37.1 165.6,37.1 171.5,37.1 177.4,37.1 183.3,37.1 189.2,37.1 195.1,37.1 200.9,37.1 206.8,37.1 212.7,37.1 218.6,37.1 224.5,37.1 230.4,37.1 236.3,37.1 242.2,37.1 248.1,37.1 254.0,37.1 259.9,37.4 265.7,36.0 271.6,40.3 277.5,43.8 283.4,43.1 289.3,43.0 295.2,51.8 301.1,51.8 307.0,52.1 312.9,51.3 318.8,49.8 324.7,44.6 330.5,51.0 336.4,54.4 342.3,52.8 348.2,53.5 354.1,54.9 360.0,53.1 365.9,51.0 371.8,67.5 377.7,67.5 383.6,67.5 389.5,67.5 395.3,67.5 401.2,67.5 407.1,67.5 413.0,67.5 418.9,67.5 424.8,67.5 430.7,67.5 436.6,67.9 442.5,67.2 448.4,81.4 454.3,81.4 460.1,81.4 466.0,81.4 471.9,81.4 477.8,81.4 483.7,81.4 489.6,81.4 495.5,81.4 501.4,81.4 507.3,81.4 513.2,81.4 519.1,81.4 524.9,81.4 530.8,81.4 536.7,87.4 542.6,88.3 548.5,71.5 554.4,85.5 560.3,112.9 566.2,112.9 572.1,112.9 578.0,112.9 583.9,112.9 589.7,112.9 595.6,112.9 601.5,113.3 607.4,113.8 613.3,114.9 619.2,117.0 625.1,123.3 631.0,124.0 636.9,144.4 642.8,154.9 648.7,166.5 654.5,168.4 660.4,164.5 666.3,177.4 672.2,178.1 678.1,173.6 684.0,184.0"/>
+</svg>
+
+<h2>Summary</h2>
+<table>
+<tr><th>Equity</th><td>$4793.63</td></tr>
+<tr><th>Wallet cash</th><td>$4793.63</td></tr>
+<tr><th>Margin locked</th><td>$406.77</td></tr>
+<tr><th>Available balance</th><td>$4386.86</td></tr>
+<tr><th>Leverage</th><td>3x (isolated)</td></tr>
+<tr><th>Closed trades</th><td>7</td></tr>
+<tr><th>Win rate</th><td>0.0%</td></tr>
+<tr><th>Profit factor</th><td>0.00</td></tr>
+<tr><th>Total P&amp;L</th><td class="neg">$-180.31</td></tr>
+<tr><th>Total funding paid</th><td>$0.04</td></tr>
+<tr><th>Max drawdown</th><td>4.0%</td></tr>
+<tr><th>Expectancy / trade</th><td>$-25.76</td></tr>
+<tr><th>Max consecutive wins / losses</th><td>0 / 7</td></tr>
+<tr><th>Vol-targeting scale factor</th><td>1.00</td></tr>
+<tr><th>Today AI spend (Claude)</th><td>$0.0595</td></tr>
+<tr><th>Total AI spend</th><td>$3.3801</td></tr>
+</table>
+
+<h2>P&amp;L by direction</h2>
+<table>
+<tr><th>Direction</th><th>Trades</th><th>Wins</th><th>Win rate</th><th>Total P&amp;L</th><th>Funding</th></tr>
+<tr><td>long</td><td>5</td><td>0</td><td>0.0%</td><td class="neg">$-128.58</td><td>$0.55</td></tr>
+<tr><td>short</td><td>2</td><td>0</td><td>0.0%</td><td class="neg">$-51.73</td><td>$-0.14</td></tr>
+</table>
+
+<h2>Realized R by trend class (is the dynamic TP earning its keep?)</h2>
+<table>
+<tr><th>Trend at entry</th><th>Trades</th><th>Wins</th><th>Avg realized R</th><th>Total P&amp;L</th></tr>
+<tr><td>strong</td><td>1</td><td>0</td><td class="neg">-1.21R</td><td class="neg">$-42.64</td></tr>
+<tr><td>normal</td><td>4</td><td>0</td><td class="neg">-1.48R</td><td class="neg">$-73.93</td></tr>
+<tr><td>weak</td><td>2</td><td>0</td><td class="neg">-1.33R</td><td class="neg">$-63.74</td></tr>
+</table>
+
+<h2>Regime accuracy (profitable trades per regime at entry)</h2>
+<table>
+<tr><th>Regime</th><th>Trades</th><th>Correct</th><th>Hit rate</th><th>Avg return %</th></tr>
+<tr><td>bullish</td><td>5</td><td>0</td><td>0.0%</td><td>-2.09</td></tr>
+<tr><td>bearish</td><td>2</td><td>0</td><td>0.0%</td><td>-2.10</td></tr>
+</table>
+
+<h2>Open positions</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Trend</th><th>TP×ATR</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
+<tr><td>SOLUSDT</td><td>🔴 SHORT</td><td>3x</td><td>normal</td><td>2.5</td><td>16.080000</td><td>75.89</td><td>76.82</td><td>74.34</td><td>$406.77</td><td>$-0.37</td><td>2026-07-13T03:56:12.616Z</td></tr>
+</table>
+
+<h2>Closed trades</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Trend</th><th>TP×ATR</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
+<tr><td>BTCUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>63923.99</td><td>62966.00</td><td>0.019500</td><td class="neg">$-19.88</td><td>$0.21</td><td>stop</td><td>2026-07-08T03:36:18.679Z</td></tr>
+<tr><td>BTCUSDT</td><td>🔴 SHORT</td><td>normal</td><td>2.5</td><td>62115.38</td><td>63140.01</td><td>0.020000</td><td class="neg">$-21.25</td><td>$-0.25</td><td>stop</td><td>2026-07-09T07:53:45.154Z</td></tr>
+<tr><td>SOLUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>79.24</td><td>78.10</td><td>15.640000</td><td class="neg">$-18.81</td><td>$0.00</td><td>stop</td><td>2026-07-10T15:07:49.613Z</td></tr>
+<tr><td>ARBUSDT</td><td>🟢 LONG</td><td>strong</td><td>4.5</td><td>0.10</td><td>0.09</td><td>12589.300000</td><td class="neg">$-42.64</td><td>$0.12</td><td>stop</td><td>2026-07-12T00:08:07.771Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1822.35</td><td>1803.09</td><td>0.671000</td><td class="neg">$-13.99</td><td>$0.10</td><td>stop</td><td>2026-07-12T22:24:23.078Z</td></tr>
+<tr><td>NEARUSDT</td><td>🔴 SHORT</td><td>weak</td><td>2</td><td>1.87</td><td>1.91</td><td>653.000000</td><td class="neg">$-30.48</td><td>$0.11</td><td>stop</td><td>2026-07-13T10:00:07.422Z</td></tr>
+<tr><td>NEARUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1.95</td><td>1.90</td><td>619.000000</td><td class="neg">$-33.26</td><td>$0.12</td><td>stop</td><td>2026-07-13T19:02:28.124Z</td></tr>
+</table>
+
+<h2>Recent orders — real fill vs signal price</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Side</th><th>Dir</th><th>Req qty</th><th>Exec qty</th><th>Signal</th><th>Fill</th><th>Slip (bps)</th><th>Status</th><th>Order ID</th></tr>
+<tr><td>2026-07-13T19:02:28.365Z</td><td>NEARUSDT</td><td>SELL</td><td>long</td><td>619</td><td>619</td><td>1.90</td><td>1.90</td><td>0.0</td><td>FILLED</td><td>464771393</td></tr>
+<tr><td>2026-07-13T15:34:09.479Z</td><td>NEARUSDT</td><td>BUY</td><td>long</td><td>619</td><td>619</td><td>1.95</td><td>1.95</td><td>0.0</td><td>FILLED</td><td>464069105</td></tr>
+<tr><td>2026-07-13T10:00:07.695Z</td><td>NEARUSDT</td><td>BUY</td><td>short</td><td>653</td><td>653</td><td>1.91</td><td>1.91</td><td>0.0</td><td>FILLED</td><td>462938674</td></tr>
+<tr><td>2026-07-13T03:56:32.909Z</td><td>NEARUSDT</td><td>SELL</td><td>short</td><td>653</td><td>653</td><td>1.87</td><td>1.87</td><td>0.0</td><td>FILLED</td><td>461720829</td></tr>
+<tr><td>2026-07-13T03:56:12.914Z</td><td>SOLUSDT</td><td>SELL</td><td>short</td><td>16.08</td><td>16.08</td><td>75.89</td><td>75.89</td><td>0.0</td><td>FILLED</td><td>3109658987</td></tr>
+<tr><td>2026-07-12T22:24:23.195Z</td><td>ETHUSDT</td><td>SELL</td><td>long</td><td>0.671</td><td>0.671</td><td>1803.09</td><td>1803.09</td><td>0.0</td><td>FILLED</td><td>13078043855</td></tr>
+<tr><td>2026-07-12T15:47:08.999Z</td><td>XAUUSDT</td><td>SELL</td><td>short</td><td>0.298</td><td></td><td>4108.16</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-12T15:46:59.909Z</td><td>ETHUSDT</td><td>BUY</td><td>long</td><td>0.671</td><td>0.671</td><td>1822.35</td><td>1822.35</td><td>0.0</td><td>FILLED</td><td>13039063916</td></tr>
+<tr><td>2026-07-12T00:08:07.988Z</td><td>ARBUSDT</td><td>SELL</td><td>long</td><td>12589.3</td><td>12589.3</td><td>0.09</td><td>0.09</td><td>0.0</td><td>FILLED</td><td>234991782</td></tr>
+<tr><td>2026-07-11T16:09:44.276Z</td><td>ARBUSDT</td><td>BUY</td><td>long</td><td>12589.3</td><td>12589.3</td><td>0.10</td><td>0.10</td><td>0.0</td><td>FILLED</td><td>234320809</td></tr>
+<tr><td>2026-07-10T15:07:49.816Z</td><td>SOLUSDT</td><td>SELL</td><td>long</td><td>15.64</td><td>15.64</td><td>78.10</td><td>78.10</td><td>0.0</td><td>FILLED</td><td>3018728742</td></tr>
+<tr><td>2026-07-10T09:53:09.660Z</td><td>SOLUSDT</td><td>BUY</td><td>long</td><td>15.64</td><td>15.64</td><td>79.24</td><td>79.24</td><td>0.0</td><td>FILLED</td><td>3011047500</td></tr>
+<tr><td>2026-07-09T07:53:52.002Z</td><td>XAGUSDT</td><td>SELL</td><td>short</td><td>20.919</td><td></td><td>59.26</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-09T07:53:45.319Z</td><td>BTCUSDT</td><td>BUY</td><td>short</td><td>0.02</td><td>0.02</td><td>63140.01</td><td>63140.01</td><td>0.0</td><td>FILLED</td><td>20334893251</td></tr>
+<tr><td>2026-07-08T16:55:33.362Z</td><td>XAUUSDT</td><td>SELL</td><td>short</td><td>0.306</td><td></td><td>4063.79</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-08T15:23:54.495Z</td><td>XAUUSDT</td><td>SELL</td><td>short</td><td>0.309</td><td></td><td>4032.17</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-08T13:00:18.834Z</td><td>XAGUSDT</td><td>SELL</td><td>short</td><td>21.253</td><td></td><td>58.61</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-08T09:36:20.346Z</td><td>BTCUSDT</td><td>SELL</td><td>short</td><td>0.02</td><td>0.02</td><td>62115.38</td><td>62115.38</td><td>0.0</td><td>FILLED</td><td>20070657475</td></tr>
+<tr><td>2026-07-08T03:36:18.826Z</td><td>BTCUSDT</td><td>SELL</td><td>long</td><td>0.0195</td><td>0.0195</td><td>62966.00</td><td>62966.00</td><td>0.0</td><td>FILLED</td><td>20000098646</td></tr>
+<tr><td>2026-07-07T15:55:57.690Z</td><td>BTCUSDT</td><td>BUY</td><td>long</td><td>0.0195</td><td>0.0195</td><td>63923.99</td><td>63923.99</td><td>0.0</td><td>FILLED</td><td>19871536104</td></tr>
+</table>
+
+<h2>Last 10 regime calls</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Regime</th><th>Conf</th><th>Trade allowed</th><th>Cost</th><th>Reasoning</th></tr>
+<tr><td>2026-07-14T01:02:31.459Z</td><td>XAGUSDT</td><td>bearish</td><td>52</td><td>no</td><td>$0.0073</td><td style="text-align:left">Price is firmly below all EMAs on both 1h and 4h timeframes and declining, confirming bearish structure, but RSI at 28.57 is deeply oversold and warns of a sharp counter-trend bounce in silver. Given </td></tr>
+<tr><td>2026-07-14T01:02:25.009Z</td><td>XAUUSDT</td><td>bearish</td><td>52</td><td>no</td><td>$0.0069</td><td style="text-align:left">Price is firmly below all 1h and 4h EMAs confirming bearish structure, but RSI at 28.15 is deeply oversold and raises meaningful bounce/squeeze risk on any short entry. Portfolio is already in drawdow</td></tr>
+<tr><td>2026-07-14T01:02:17.820Z</td><td>NEARUSDT</td><td>bullish</td><td>60</td><td>yes</td><td>$0.0075</td><td style="text-align:left">Price has rallied consistently over the last 4-5 hourly candles, now sitting at 1.95 above 1h e20/e50 with RSI near 58 — clean short-term bullish structure. The 4h e200 at 2.01 is a nearby ceiling to </td></tr>
+<tr><td>2026-07-14T01:02:07.990Z</td><td>DOGEUSDT</td><td>chop</td><td>15</td><td>no</td><td>$0.0063</td><td style="text-align:left">Price is completely flat at 0.07 across all 5 hourly candles with all EMAs compressed to the same level, indicating near-zero directional momentum. No tradeable edge exists in this environment and the</td></tr>
+<tr><td>2026-07-14T01:02:01.213Z</td><td>SUIUSDT</td><td>chop</td><td>72</td><td>no</td><td>$0.0070</td><td style="text-align:left">Price is pinned exactly at the 4h EMA50/EMA200 cluster with RSI at 49 and all EMAs tightly coiled, indicating a textbook sideways, undirected market. With zero directional momentum, a 7-day win rate o</td></tr>
+<tr><td>2026-07-14T01:01:52.641Z</td><td>SOLUSDT</td><td>bearish</td><td>58</td><td>no</td><td>$0.0084</td><td style="text-align:left">Price remains below all key 1h EMAs and 4h e20/e50, confirming a bearish structure with -2.66% 24h decline, but the last 5 candles show a recovery bounce from 74.1 to 75.41 suggesting short-term count</td></tr>
+<tr><td>2026-07-14T01:01:45.084Z</td><td>ETHUSDT</td><td>chop</td><td>55</td><td>no</td><td>$0.0076</td><td style="text-align:left">Price is compressed between 1h and 4h EMAs with RSI at neutral 52 and a short-term bounce that lacks follow-through conviction, while the 4h e20 sits overhead as near-term resistance. Portfolio drawdo</td></tr>
+<tr><td>2026-07-14T01:01:35.511Z</td><td>BTCUSDT</td><td>chop</td><td>52</td><td>no</td><td>$0.0084</td><td style="text-align:left">Price is below all 1h EMAs and the 4h e20/e50, supporting a bearish bias, but the last three 1h candles show a clear recovery bounce from the lows (~61882 to 62515), undermining short entry conviction</td></tr>
+<tr><td>2026-07-13T23:32:38.101Z</td><td>LTCUSDT</td><td>chop</td><td>55</td><td>no</td><td>$0.0077</td><td style="text-align:left">Price is below all 1h EMAs indicating mild bearish pressure, but the extremely compressed volatility (ATR% 0.63%), tight 1h price range (~43.07-43.50), and RSI near 44 reflect genuine consolidation wi</td></tr>
+<tr><td>2026-07-13T23:32:31.224Z</td><td>BNBUSDT</td><td>bearish</td><td>60</td><td>yes</td><td>$0.0072</td><td style="text-align:left">Price remains below all 1h and 4h EMAs (e20/e50/e200 all stacked bearishly above price), with RSI at 41.6 and a negative 24h return confirming sustained downside pressure. The tight consolidation near</td></tr>
+</table>
+</body></html>
