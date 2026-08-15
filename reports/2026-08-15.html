@@ -1,0 +1,140 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>TradePilot-Futures 2026-08-15</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; font-size: 13px; text-align: right; }
+  th { background: #f3f4f6; }
+  td:first-child, th:first-child { text-align: left; }
+  .neg { color: #dc2626; } .pos { color: #16a34a; }
+  h2 { margin-top: 2rem; }
+  .banner { background: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 6px; }
+</style></head><body>
+<h1>TradePilot-Futures — Daily Report 2026-08-15</h1>
+<p class="banner"><strong>EXECUTOR: FUTURES TESTNET (3x leverage)</strong> — Binance USD-M futures testnet, isolated margin, long + short. <strong>No real funds.</strong> Mainnet futures trading is intentionally not implemented. Runs in parallel with the spot TradePilot for a 30-day A/B comparison.</p>
+
+<h2>Equity curve</h2>
+<svg width="720" height="220" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="220" fill="#fafafa" stroke="#ddd"/>
+  <text x="36" y="18" font-family="monospace" font-size="12">max 5001.43</text>
+  <text x="36" y="212" font-family="monospace" font-size="12">min 4761.80</text>
+  <polyline fill="none" stroke="#2563eb" stroke-width="2" points="36.0,36.9 37.2,36.9 38.4,36.9 39.6,36.9 40.8,36.9 42.0,36.9 43.2,36.9 44.4,36.9 45.6,36.9 46.8,36.9 48.0,36.9 49.2,36.9 50.5,36.9 51.7,36.9 52.9,36.9 54.1,36.9 55.3,36.9 56.5,36.9 57.7,36.9 58.9,36.9 60.1,36.9 61.3,36.9 62.5,36.9 63.7,36.9 64.9,36.9 66.1,36.9 67.3,36.9 68.5,36.9 69.7,36.9 70.9,36.9 72.1,36.9 73.3,36.9 74.5,36.9 75.7,36.9 77.0,36.9 78.2,36.9 79.4,36.9 80.6,36.9 81.8,37.2 83.0,36.0 84.2,39.6 85.4,42.5 86.6,41.9 87.8,41.8 89.0,49.2 90.2,49.2 91.4,49.5 92.6,48.8 93.8,47.5 95.0,43.2 96.2,48.5 97.4,51.4 98.6,50.0 99.8,50.6 101.0,51.8 102.2,50.3 103.4,48.5 104.7,62.3 105.9,62.3 107.1,62.3 108.3,62.3 109.5,62.3 110.7,62.3 111.9,62.3 113.1,62.3 114.3,62.3 115.5,62.3 116.7,62.3 117.9,62.6 119.1,62.0 120.3,73.9 121.5,73.9 122.7,73.9 123.9,73.9 125.1,73.9 126.3,73.9 127.5,73.9 128.7,73.9 129.9,73.9 131.2,73.9 132.4,73.9 133.6,73.9 134.8,73.9 136.0,73.9 137.2,73.9 138.4,78.9 139.6,79.7 140.8,65.7 142.0,77.3 143.2,100.2 144.4,100.2 145.6,100.2 146.8,100.2 148.0,100.2 149.2,100.2 150.4,100.2 151.6,100.5 152.8,100.9 154.0,101.9 155.2,103.6 156.4,108.9 157.7,109.5 158.9,126.5 160.1,135.3 161.3,144.9 162.5,146.5 163.7,143.3 164.9,154.1 166.1,154.7 167.3,150.9 168.5,159.6 169.7,156.8 170.9,158.5 172.1,158.2 173.3,156.8 174.5,159.4 175.7,173.4 176.9,178.3 178.1,178.6 179.3,184.0 180.5,182.2 181.7,180.6 182.9,179.6 184.1,175.1 185.4,181.4 186.6,172.4 187.8,177.0 189.0,172.0 190.2,173.3 191.4,163.4 192.6,149.6 193.8,152.0 195.0,154.3 196.2,154.3 197.4,155.4 198.6,156.4 199.8,156.1 201.0,158.4 202.2,159.4 203.4,158.2 204.6,164.3 205.8,163.5 207.0,166.4 208.2,158.1 209.4,159.1 210.6,163.2 211.9,164.2 213.1,163.6 214.3,163.5 215.5,169.0 216.7,171.6 217.9,130.8 219.1,133.3 220.3,135.1 221.5,138.0 222.7,136.1 223.9,130.9 225.1,134.0 226.3,133.8 227.5,142.5 228.7,142.2 229.9,140.6 231.1,141.9 232.3,137.0 233.5,131.7 234.7,131.7 235.9,131.7 237.1,131.7 238.3,131.7 239.6,131.7 240.8,131.7 242.0,131.7 243.2,116.0 244.4,117.5 245.6,117.7 246.8,118.9 248.0,118.3 249.2,118.1 250.4,119.1 251.6,118.7 252.8,117.8 254.0,118.5 255.2,112.7 256.4,113.3 257.6,114.3 258.8,113.1 260.0,117.3 261.2,115.0 262.4,113.4 263.6,115.8 264.8,106.5 266.1,111.9 267.3,114.1 268.5,114.1 269.7,114.4 270.9,115.7 272.1,104.6 273.3,101.7 274.5,104.8 275.7,101.5 276.9,105.1 278.1,102.8 279.3,98.1 280.5,94.1 281.7,89.0 282.9,88.7 284.1,93.2 285.3,88.4 286.5,96.2 287.7,106.4 288.9,107.9 290.1,111.7 291.3,112.9 292.6,117.5 293.8,119.8 295.0,122.1 296.2,122.1 297.4,122.1 298.6,122.1 299.8,122.1 301.0,122.1 302.2,122.1 303.4,122.1 304.6,122.4 305.8,126.2 307.0,130.7 308.2,132.8 309.4,132.8 310.6,132.8 311.8,132.8 313.0,132.8 314.2,132.8 315.4,132.8 316.6,132.8 317.8,132.8 319.0,132.8 320.3,132.8 321.5,132.8 322.7,132.8 323.9,132.8 325.1,132.8 326.3,132.8 327.5,132.8 328.7,132.8 329.9,132.8 331.1,133.1 332.3,132.2 333.5,127.4 334.7,113.0 335.9,116.8 337.1,113.0 338.3,114.5 339.5,114.7 340.7,116.9 341.9,118.3 343.1,118.2 344.3,113.0 345.5,110.2 346.8,110.2 348.0,109.1 349.2,110.3 350.4,108.8 351.6,115.1 352.8,119.2 354.0,122.9 355.2,122.7 356.4,123.9 357.6,123.2 358.8,123.4 360.0,127.4 361.2,129.5 362.4,129.5 363.6,129.5 364.8,129.5 366.0,129.8 367.2,125.6 368.4,111.3 369.6,111.3 370.8,111.3 372.0,111.3 373.2,111.3 374.5,111.3 375.7,111.3 376.9,111.3 378.1,111.3 379.3,111.3 380.5,111.3 381.7,111.3 382.9,111.3 384.1,111.3 385.3,111.3 386.5,111.3 387.7,111.3 388.9,111.3 390.1,111.3 391.3,111.3 392.5,111.3 393.7,111.3 394.9,111.3 396.1,111.3 397.3,111.3 398.5,111.3 399.7,111.3 401.0,111.3 402.2,111.3 403.4,111.3 404.6,111.3 405.8,111.3 407.0,111.3 408.2,111.3 409.4,111.3 410.6,111.3 411.8,111.3 413.0,111.3 414.2,111.3 415.4,111.3 416.6,111.3 417.8,111.3 419.0,111.3 420.2,111.3 421.4,111.3 422.6,111.3 423.8,111.3 425.0,111.3 426.2,111.3 427.4,111.3 428.7,111.3 429.9,111.3 431.1,111.3 432.3,111.3 433.5,111.3 434.7,111.3 435.9,111.3 437.1,111.3 438.3,111.3 439.5,111.3 440.7,111.3 441.9,111.3 443.1,111.3 444.3,111.3 445.5,111.3 446.7,111.3 447.9,111.3 449.1,111.3 450.3,111.3 451.5,111.3 452.7,111.3 453.9,111.3 455.2,111.3 456.4,111.3 457.6,111.3 458.8,111.3 460.0,111.3 461.2,111.3 462.4,111.3 463.6,111.3 464.8,111.3 466.0,111.3 467.2,111.3 468.4,111.3 469.6,111.3 470.8,111.3 472.0,111.3 473.2,111.3 474.4,111.3 475.6,111.3 476.8,111.3 478.0,111.3 479.2,111.3 480.4,111.3 481.7,111.3 482.9,111.3 484.1,111.3 485.3,111.3 486.5,111.3 487.7,111.3 488.9,111.3 490.1,111.3 491.3,111.3 492.5,111.3 493.7,111.3 494.9,111.3 496.1,111.3 497.3,111.3 498.5,111.3 499.7,111.3 500.9,111.3 502.1,111.3 503.3,111.3 504.5,111.3 505.7,111.3 506.9,111.3 508.1,111.3 509.4,111.3 510.6,111.3 511.8,111.3 513.0,111.3 514.2,111.3 515.4,111.3 516.6,111.3 517.8,111.3 519.0,111.3 520.2,111.3 521.4,111.3 522.6,111.3 523.8,111.3 525.0,111.3 526.2,111.3 527.4,111.3 528.6,111.3 529.8,111.3 531.0,111.3 532.2,111.3 533.4,111.3 534.6,111.3 535.9,111.3 537.1,111.3 538.3,111.3 539.5,111.3 540.7,111.3 541.9,111.3 543.1,111.3 544.3,111.3 545.5,111.3 546.7,111.3 547.9,111.3 549.1,111.3 550.3,111.3 551.5,111.3 552.7,111.3 553.9,111.3 555.1,111.3 556.3,111.3 557.5,111.3 558.7,111.3 559.9,111.3 561.1,111.3 562.3,111.3 563.6,111.3 564.8,111.3 566.0,111.3 567.2,111.3 568.4,111.3 569.6,111.3 570.8,111.3 572.0,111.3 573.2,111.3 574.4,111.3 575.6,111.3 576.8,111.3 578.0,111.3 579.2,111.3 580.4,111.3 581.6,111.3 582.8,111.3 584.0,111.3 585.2,111.3 586.4,111.3 587.6,111.3 588.8,111.3 590.1,111.3 591.3,111.3 592.5,111.3 593.7,111.3 594.9,111.3 596.1,111.3 597.3,111.3 598.5,111.3 599.7,111.3 600.9,111.3 602.1,111.3 603.3,111.3 604.5,111.3 605.7,111.3 606.9,111.3 608.1,111.3 609.3,111.3 610.5,111.3 611.7,111.3 612.9,111.3 614.1,111.3 615.3,111.3 616.6,111.3 617.8,111.3 619.0,111.3 620.2,111.3 621.4,111.3 622.6,111.3 623.8,111.3 625.0,111.3 626.2,111.3 627.4,111.3 628.6,111.3 629.8,111.3 631.0,111.3 632.2,111.3 633.4,111.3 634.6,111.3 635.8,111.3 637.0,111.3 638.2,111.3 639.4,111.3 640.6,111.3 641.8,111.3 643.0,111.3 644.3,111.3 645.5,111.3 646.7,111.3 647.9,111.3 649.1,111.3 650.3,111.3 651.5,111.3 652.7,111.3 653.9,111.3 655.1,111.3 656.3,111.3 657.5,111.3 658.7,111.3 659.9,111.3 661.1,111.3 662.3,111.3 663.5,111.3 664.7,111.3 665.9,111.3 667.1,111.3 668.3,111.3 669.5,111.3 670.8,111.3 672.0,111.3 673.2,111.3 674.4,111.3 675.6,111.3 676.8,111.3 678.0,111.3 679.2,111.3 680.4,111.3 681.6,111.3 682.8,111.3 684.0,111.3"/>
+</svg>
+
+<h2>Summary</h2>
+<table>
+<tr><th>Equity</th><td>$4879.57</td></tr>
+<tr><th>Wallet cash</th><td>$4879.57</td></tr>
+<tr><th>Margin locked</th><td>$0.00</td></tr>
+<tr><th>Available balance</th><td>$4879.57</td></tr>
+<tr><th>Leverage</th><td>3x (isolated)</td></tr>
+<tr><th>Closed trades</th><td>24</td></tr>
+<tr><th>Win rate</th><td>37.5%</td></tr>
+<tr><th>Profit factor</th><td>0.70</td></tr>
+<tr><th>Total P&amp;L</th><td class="neg">$-94.50</td></tr>
+<tr><th>Total funding paid</th><td>$1.24</td></tr>
+<tr><th>Max drawdown</th><td>4.8%</td></tr>
+<tr><th>Expectancy / trade</th><td>$-3.94</td></tr>
+<tr><th>Max consecutive wins / losses</th><td>4 / 8</td></tr>
+<tr><th>Vol-targeting scale factor</th><td>1.00</td></tr>
+<tr><th>Today AI spend (Claude)</th><td>$0.0000</td></tr>
+<tr><th>Total AI spend</th><td>$8.2603</td></tr>
+</table>
+
+<h2>P&amp;L by direction</h2>
+<table>
+<tr><th>Direction</th><th>Trades</th><th>Wins</th><th>Win rate</th><th>Total P&amp;L</th><th>Funding</th></tr>
+<tr><td>long</td><td>17</td><td>7</td><td>41.2%</td><td class="neg">$-85.38</td><td>$1.62</td></tr>
+<tr><td>short</td><td>7</td><td>2</td><td>28.6%</td><td class="neg">$-9.12</td><td>$-0.38</td></tr>
+</table>
+
+<h2>Realized R by trend class (is the dynamic TP earning its keep?)</h2>
+<table>
+<tr><th>Trend at entry</th><th>Trades</th><th>Wins</th><th>Avg realized R</th><th>Total P&amp;L</th></tr>
+<tr><td>strong</td><td>1</td><td>0</td><td class="neg">-1.21R</td><td class="neg">$-42.64</td></tr>
+<tr><td>normal</td><td>14</td><td>3</td><td class="neg">-0.68R</td><td class="neg">$-128.89</td></tr>
+<tr><td>weak</td><td>9</td><td>6</td><td class="pos">0.83R</td><td class="pos">$77.03</td></tr>
+</table>
+
+<h2>Regime accuracy (profitable trades per regime at entry)</h2>
+<table>
+<tr><th>Regime</th><th>Trades</th><th>Correct</th><th>Hit rate</th><th>Avg return %</th></tr>
+<tr><td>bullish</td><td>17</td><td>7</td><td>41.2%</td><td>-0.40</td></tr>
+<tr><td>bearish</td><td>7</td><td>2</td><td>28.6%</td><td>-0.09</td></tr>
+</table>
+
+<h2>Open positions</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Lev</th><th>Trend</th><th>TP×ATR</th><th>Qty</th><th>Entry</th><th>Stop</th><th>Take-profit</th><th>Margin</th><th>Funding paid</th><th>Opened</th></tr>
+<tr><td colspan="12">none</td></tr>
+</table>
+
+<h2>Closed trades</h2>
+<table>
+<tr><th>Pair</th><th>Direction</th><th>Trend</th><th>TP×ATR</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&amp;L</th><th>Funding</th><th>Reason</th><th>Closed at</th></tr>
+<tr><td>BTCUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>63923.99</td><td>62966.00</td><td>0.019500</td><td class="neg">$-19.88</td><td>$0.21</td><td>stop</td><td>2026-07-08T03:36:18.679Z</td></tr>
+<tr><td>BTCUSDT</td><td>🔴 SHORT</td><td>normal</td><td>2.5</td><td>62115.38</td><td>63140.01</td><td>0.020000</td><td class="neg">$-21.25</td><td>$-0.25</td><td>stop</td><td>2026-07-09T07:53:45.154Z</td></tr>
+<tr><td>SOLUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>79.24</td><td>78.10</td><td>15.640000</td><td class="neg">$-18.81</td><td>$0.00</td><td>stop</td><td>2026-07-10T15:07:49.613Z</td></tr>
+<tr><td>ARBUSDT</td><td>🟢 LONG</td><td>strong</td><td>4.5</td><td>0.10</td><td>0.09</td><td>12589.300000</td><td class="neg">$-42.64</td><td>$0.12</td><td>stop</td><td>2026-07-12T00:08:07.771Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1822.35</td><td>1803.09</td><td>0.671000</td><td class="neg">$-13.99</td><td>$0.10</td><td>stop</td><td>2026-07-12T22:24:23.078Z</td></tr>
+<tr><td>SOLUSDT</td><td>🔴 SHORT</td><td>normal</td><td>2.5</td><td>75.89</td><td>77.27</td><td>16.080000</td><td class="neg">$-22.69</td><td>$-0.49</td><td>stop</td><td>2026-07-14T15:01:31.510Z</td></tr>
+<tr><td>NEARUSDT</td><td>🔴 SHORT</td><td>weak</td><td>2</td><td>1.87</td><td>1.91</td><td>653.000000</td><td class="neg">$-30.48</td><td>$0.11</td><td>stop</td><td>2026-07-13T10:00:07.422Z</td></tr>
+<tr><td>NEARUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1.95</td><td>1.90</td><td>619.000000</td><td class="neg">$-33.26</td><td>$0.12</td><td>stop</td><td>2026-07-13T19:02:28.124Z</td></tr>
+<tr><td>LINKUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>8.31</td><td>8.54</td><td>143.460000</td><td class="pos">$30.65</td><td>$0.23</td><td>tp</td><td>2026-07-15T14:41:22.730Z</td></tr>
+<tr><td>BTCUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>64517.62</td><td>63770.40</td><td>0.018400</td><td class="neg">$-15.18</td><td>$0.49</td><td>stop</td><td>2026-07-16T23:35:08.602Z</td></tr>
+<tr><td>TIAUSDT</td><td>🔴 SHORT</td><td>weak</td><td>2</td><td>0.40</td><td>0.37</td><td>1506.000000</td><td class="pos">$70.87</td><td>$0.32</td><td>tp</td><td>2026-07-18T03:28:33.512Z</td></tr>
+<tr><td>BNBUSDT</td><td>🔴 SHORT</td><td>weak</td><td>2</td><td>564.38</td><td>569.04</td><td>2.140000</td><td class="neg">$-10.94</td><td>$0.00</td><td>stop</td><td>2026-07-17T21:29:57.320Z</td></tr>
+<tr><td>LTCUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>46.29</td><td>46.80</td><td>13.087000</td><td class="pos">$18.85</td><td>$-0.07</td><td>stop</td><td>2026-07-20T07:50:41.026Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1866.02</td><td>1882.84</td><td>0.652000</td><td class="pos">$9.73</td><td>$0.26</td><td>tp</td><td>2026-07-20T01:11:37.840Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1873.31</td><td>1906.32</td><td>0.650000</td><td class="pos">$20.55</td><td>$-0.08</td><td>tp</td><td>2026-07-20T18:32:23.072Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1906.32</td><td>1940.72</td><td>0.642000</td><td class="pos">$21.05</td><td>$0.05</td><td>tp</td><td>2026-07-21T09:15:39.624Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1940.72</td><td>1919.38</td><td>0.633000</td><td class="neg">$-14.57</td><td>$0.09</td><td>stop</td><td>2026-07-21T18:55:32.412Z</td></tr>
+<tr><td>NEARUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1.99</td><td>1.95</td><td>618.000000</td><td class="neg">$-22.69</td><td>$0.08</td><td>stop</td><td>2026-07-21T16:14:22.795Z</td></tr>
+<tr><td>XRPUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1.16</td><td>1.14</td><td>1055.400000</td><td class="neg">$-17.33</td><td>$0.00</td><td>stop</td><td>2026-07-21T23:38:38.920Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>normal</td><td>2.5</td><td>1952.21</td><td>1925.82</td><td>0.622000</td><td class="neg">$-17.38</td><td>$0.00</td><td>stop</td><td>2026-07-22T20:05:07.405Z</td></tr>
+<tr><td>SOLUSDT</td><td>🔴 SHORT</td><td>normal</td><td>2.5</td><td>75.56</td><td>74.54</td><td>8.010000</td><td class="pos">$21.61</td><td>$-0.15</td><td>stop</td><td>2026-07-25T17:39:10.145Z</td></tr>
+<tr><td>LTCUSDT</td><td>🔴 SHORT</td><td>normal</td><td>2.5</td><td>46.32</td><td>46.90</td><td>26.198000</td><td class="neg">$-16.24</td><td>$0.07</td><td>stop</td><td>2026-07-26T07:17:13.223Z</td></tr>
+<tr><td>ETHUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>1886.53</td><td>1919.26</td><td>0.321000</td><td class="pos">$17.56</td><td>$0.03</td><td>tp</td><td>2026-07-26T16:43:56.299Z</td></tr>
+<tr><td>LTCUSDT</td><td>🟢 LONG</td><td>weak</td><td>2</td><td>46.96</td><td>47.46</td><td>25.856000</td><td class="pos">$11.95</td><td>$0.00</td><td>tp</td><td>2026-07-26T15:53:52.064Z</td></tr>
+</table>
+
+<h2>Recent orders — real fill vs signal price</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Side</th><th>Dir</th><th>Req qty</th><th>Exec qty</th><th>Signal</th><th>Fill</th><th>Slip (bps)</th><th>Status</th><th>Order ID</th></tr>
+<tr><td>2026-07-26T16:43:56.445Z</td><td>ETHUSDT</td><td>SELL</td><td>long</td><td>0.321</td><td>0.321</td><td>1919.26</td><td>1919.26</td><td>0.0</td><td>FILLED</td><td>14632853560</td></tr>
+<tr><td>2026-07-26T15:53:52.212Z</td><td>LTCUSDT</td><td>SELL</td><td>long</td><td>25.856</td><td>25.856</td><td>47.46</td><td>47.46</td><td>0.0</td><td>FILLED</td><td>1429697735</td></tr>
+<tr><td>2026-07-26T15:53:44.523Z</td><td>ETHUSDT</td><td>SELL</td><td>long</td><td>0.321</td><td>0.321</td><td>1911.64</td><td>1911.64</td><td>0.0</td><td>FILLED</td><td>14629162965</td></tr>
+<tr><td>2026-07-26T14:55:45.198Z</td><td>LTCUSDT</td><td>BUY</td><td>long</td><td>25.856</td><td>25.856</td><td>46.96</td><td>46.96</td><td>0.0</td><td>FILLED</td><td>1429400821</td></tr>
+<tr><td>2026-07-26T13:52:32.971Z</td><td>ETHUSDT</td><td>BUY</td><td>long</td><td>0.642</td><td>0.642</td><td>1886.53</td><td>1886.53</td><td>0.0</td><td>FILLED</td><td>14620295757</td></tr>
+<tr><td>2026-07-26T07:17:13.366Z</td><td>LTCUSDT</td><td>BUY</td><td>short</td><td>26.198</td><td>26.198</td><td>46.90</td><td>46.90</td><td>0.0</td><td>FILLED</td><td>1426997077</td></tr>
+<tr><td>2026-07-25T17:39:10.346Z</td><td>SOLUSDT</td><td>BUY</td><td>short</td><td>8.01</td><td>8.01</td><td>74.54</td><td>74.54</td><td>0.0</td><td>FILLED</td><td>3501774178</td></tr>
+<tr><td>2026-07-24T14:42:27.885Z</td><td>SOLUSDT</td><td>BUY</td><td>short</td><td>8.01</td><td>8.01</td><td>73.78</td><td>73.78</td><td>0.0</td><td>FILLED</td><td>3464652125</td></tr>
+<tr><td>2026-07-24T12:52:12.935Z</td><td>LTCUSDT</td><td>SELL</td><td>short</td><td>26.198</td><td>26.198</td><td>46.32</td><td>46.32</td><td>0.0</td><td>FILLED</td><td>1414236090</td></tr>
+<tr><td>2026-07-24T09:30:30.060Z</td><td>SOLUSDT</td><td>SELL</td><td>short</td><td>16.02</td><td>16.02</td><td>75.56</td><td>75.56</td><td>0.0</td><td>FILLED</td><td>3457612427</td></tr>
+<tr><td>2026-07-23T19:42:29.312Z</td><td>XAGUSDT</td><td>SELL</td><td>short</td><td>21.019</td><td></td><td>57.62</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-23T04:29:47.425Z</td><td>XAGUSDT</td><td>BUY</td><td>long</td><td>20.209</td><td></td><td>59.93</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-22T22:31:11.726Z</td><td>XAUUSDT</td><td>BUY</td><td>long</td><td>0.293</td><td></td><td>4127.12</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-22T20:05:07.579Z</td><td>ETHUSDT</td><td>SELL</td><td>long</td><td>0.622</td><td>0.622</td><td>1925.82</td><td>1925.82</td><td>0.0</td><td>FILLED</td><td>14217008034</td></tr>
+<tr><td>2026-07-22T16:42:26.678Z</td><td>ETHUSDT</td><td>BUY</td><td>long</td><td>0.622</td><td>0.622</td><td>1952.21</td><td>1952.21</td><td>0.0</td><td>FILLED</td><td>14201583651</td></tr>
+<tr><td>2026-07-22T12:58:17.202Z</td><td>XAGUSDT</td><td>BUY</td><td>long</td><td>20.539</td><td></td><td>59.18</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-22T12:58:17.051Z</td><td>XAUUSDT</td><td>BUY</td><td>long</td><td>0.295</td><td></td><td>4116.35</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-21T23:38:39.087Z</td><td>XRPUSDT</td><td>SELL</td><td>long</td><td>1055.4</td><td>1055.4</td><td>1.14</td><td>1.14</td><td>0.0</td><td>FILLED</td><td>2837201740</td></tr>
+<tr><td>2026-07-21T18:56:01.962Z</td><td>XAGUSDT</td><td>BUY</td><td>long</td><td>20.697</td><td></td><td>58.93</td><td></td><td>n/a</td><td>ERROR</td><td></td></tr>
+<tr><td>2026-07-21T18:55:46.971Z</td><td>XRPUSDT</td><td>BUY</td><td>long</td><td>1055.4</td><td>1055.4</td><td>1.16</td><td>1.16</td><td>0.0</td><td>FILLED</td><td>2832288021</td></tr>
+</table>
+
+<h2>Last 10 regime calls</h2>
+<table>
+<tr><th>Time</th><th>Pair</th><th>Regime</th><th>Conf</th><th>Trade allowed</th><th>Cost</th><th>Reasoning</th></tr>
+<tr><td>2026-07-26T15:53:52.699Z</td><td>XAUUSDT</td><td>bullish</td><td>62</td><td>yes</td><td>$0.0079</td><td style="text-align:left">Gold&#39;s 1h EMA stack is cleanly bullish (price &gt; e20 &gt; e50 &gt; e200) with RSI at 66 and steady upward drift in recent candles, supporting trend continuation. The 4h e200 at 4076 is modest resistance over</td></tr>
+<tr><td>2026-07-26T15:53:45.168Z</td><td>SOLUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0076</td><td style="text-align:left">Price is breaking above 1h EMAs with RSI at 67 and five consecutive hourly candles recovering, showing genuine upside momentum. However, overhead resistance from 4h e50 (75.88) and e200 (76.2) caps co</td></tr>
+<tr><td>2026-07-26T14:55:38.761Z</td><td>LTCUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0072</td><td style="text-align:left">Price is above all 1h and 4h EMAs with RSI at 57.57 and a +2.13% 24h move, indicating a mild but genuine bullish structure. The recent pullback to 46.96 still holds above key EMAs, supporting a cautio</td></tr>
+<tr><td>2026-07-26T13:52:47.902Z</td><td>DOGEUSDT</td><td>chop</td><td>35</td><td>no</td><td>$0.0078</td><td style="text-align:left">Despite RSI at 63 and a +4.33% 24h gain, recent bullish regime calls have consistently produced negative returns, suggesting the momentum is not translating into profitable directional movement. With </td></tr>
+<tr><td>2026-07-26T13:52:40.002Z</td><td>AVAXUSDT</td><td>bullish</td><td>58</td><td>yes</td><td>$0.0081</td><td style="text-align:left">Price remains above all 1h EMAs with a +3.47% 24h gain and RSI at 53, indicating an intact bullish structure despite the near-term hourly drift lower. The 4h EMA alignment is less clean (e200 above e5</td></tr>
+<tr><td>2026-07-26T13:52:33.807Z</td><td>XRPUSDT</td><td>chop</td><td>80</td><td>no</td><td>$0.0068</td><td style="text-align:left">All five 1H candles show identical OHLC at 1.1 with near-zero ATR (0.3%), indicating a completely frozen, illiquid market with no directional momentum. EMAs are tightly clustered with no meaningful sp</td></tr>
+<tr><td>2026-07-26T12:01:58.362Z</td><td>XAGUSDT</td><td>bullish</td><td>63</td><td>yes</td><td>$0.0077</td><td style="text-align:left">Silver has broken out cleanly above all 1h EMAs with a strong impulse candle pushing to 59.02, and price sits 1.18% above the 4h EMA50 — structure supports trend continuation. RSI overbought and eleva</td></tr>
+<tr><td>2026-07-26T12:01:44.011Z</td><td>BNBUSDT</td><td>chop</td><td>60</td><td>no</td><td>$0.0078</td><td style="text-align:left">Price is drifting marginally lower over the past 5 hours in an extremely tight range (ATR 0.21%), with 4h EMA50 slightly above price creating mixed structure despite 1h EMAs being supportive. Lack of </td></tr>
+<tr><td>2026-07-26T12:01:30.759Z</td><td>ETHUSDT</td><td>bullish</td><td>62</td><td>yes</td><td>$0.0073</td><td style="text-align:left">Price is above all 4h EMAs with bullish alignment and RSI at 63.71 supports continued upside momentum on a steady 24h grind. The main near-term resistance is the 1h EMA200 at 1888.28, but 4h structure</td></tr>
+<tr><td>2026-07-26T12:01:21.499Z</td><td>BTCUSDT</td><td>chop</td><td>55</td><td>no</td><td>$0.0080</td><td style="text-align:left">Price is sandwiched between the 1h EMA200 resistance (~65000) and 4h EMA20/50 overhead, with a very low ATR% (0.17%) and tight 5-candle range indicating no real momentum in either direction. RSI is ne</td></tr>
+</table>
+</body></html>
