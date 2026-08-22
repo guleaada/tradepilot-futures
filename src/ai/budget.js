@@ -23,6 +23,22 @@ export function addSpend(usd, db = getDb(), date = todayUtc(), provider = 'anthr
   ).run(date, provider, usd);
 }
 
+// Per-provider spend for a date, plus the total. Used by reporting so a
+// multi-provider run is never collapsed into a single "Claude" figure.
+export function getSpendByProvider(db = getDb(), date = todayUtc()) {
+  const rows = db.prepare('SELECT provider, spend FROM ai_budget WHERE date = ? ORDER BY provider').all(date);
+  return { byProvider: rows, total: rows.reduce((sum, r) => sum + r.spend, 0) };
+}
+
+// Count of calls whose (provider, model) had no verified price, per provider.
+export function getPricingUnknownCounts(db = getDb(), date = todayUtc()) {
+  return db.prepare(
+    `SELECT provider, COUNT(*) AS n FROM regime_calls
+     WHERE pricing_status = 'unknown' AND ts >= ? AND ts < ?
+     GROUP BY provider ORDER BY provider`,
+  ).all(`${date}T00:00:00`, `${date}T23:59:59.999`);
+}
+
 export function wouldExceedBudget(
   estCostUsd,
   capUsd = config.aiDailyBudgetUsd,
@@ -50,10 +66,24 @@ export function warnIfBudgetMisconfigured(estCostUsd, capUsd, provider, db = get
   return true;
 }
 
-export function costFromUsage(inputTokens, outputTokens, pricing = config.pricing) {
+// Cost for a call, given EXPLICIT pricing. There is deliberately no default
+// pricing argument: a caller that has not resolved a price must not be able to
+// silently borrow someone else's rate.
+//
+// Returns null when the price is unknown — null means "not computable", which
+// is different from 0 ("computed, and free"). Callers persist null as
+// est_cost and never add it to a budget.
+export function costFromUsage(inputTokens, outputTokens, pricing) {
+  if (!pricing || pricing.status === 'unknown'
+    || !Number.isFinite(pricing.inputPerMTok) || !Number.isFinite(pricing.outputPerMTok)) {
+    return null;
+  }
   return (inputTokens * pricing.inputPerMTok + outputTokens * pricing.outputPerMTok) / 1_000_000;
 }
 
-export function estimateCallCost(cfg = config) {
-  return costFromUsage(cfg.estInputTokens, cfg.estOutputTokens, cfg.pricing);
+// Pre-call budget estimate for a specific provider/model price. Null when the
+// price is unknown, which the caller treats as "cannot gate on dollars"
+// (see the call-bounding note in regime.js).
+export function estimateCallCost(pricing, cfg = config) {
+  return costFromUsage(cfg.estInputTokens, cfg.estOutputTokens, pricing);
 }

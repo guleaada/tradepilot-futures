@@ -40,12 +40,12 @@ test('spend is isolated per provider', () => {
 });
 
 test('cost math: usage tokens x pricing constants', () => {
-  const pricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 };
+  const pricing = { inputPerMTok: 3.0, outputPerMTok: 15.0, status: 'exact' };
   // 2000 in + 400 out = 2000*3/1M + 400*15/1M = 0.006 + 0.006 = 0.012
   assert.ok(Math.abs(costFromUsage(2000, 400, pricing) - 0.012) < 1e-12);
   assert.equal(costFromUsage(0, 0, pricing), 0);
   // the default estimate must comfortably fit the default $0.50/day cap
-  assert.ok(estimateCallCost() < 0.5);
+  assert.ok(estimateCallCost(pricing) < 0.5);
 });
 
 test('an estimate above the whole daily cap logs BUDGET_MISCONFIGURED once per day', () => {

@@ -15,7 +15,10 @@ import { config, MAX_ALLOWED_LEVERAGE } from './config.js';
 import { closeDb, getDb, logEvent, nowIso } from './db.js';
 import { getDailyKlines, getFundingRate, getFuturesTicker24h, getKlines, getTicker24h } from './data/binance.js';
 import { adx, atr, correlation, ema, last, returns, rsi, sma, volatility } from './indicators.js';
-import { buildMarketSummary, getRegime, regimeCallOutcomes } from './ai/regime.js';
+import { buildMarketSummary, evaluateRegime, regimeCallOutcomes } from './ai/regime.js';
+import { runShadowEvaluation } from './ai/shadow.js';
+import { reconcileOpenRouterCosts } from './ai/reconcile.js';
+import { createSnapshotId } from './ai/snapshot.js';
 import { sendAlert } from './alert.js';
 import {
   assertFuturesTestnetBase,
@@ -38,7 +41,7 @@ import {
   volTargetScaleFromDb,
 } from './engine/portfolio.js';
 import { consoleSummary } from './report/daily.js';
-import { getDailySpend } from './ai/budget.js';
+import { getSpendByProvider } from './ai/budget.js';
 
 // Selected in main(). Always the futures TESTNET executor (with the mock
 // transport under TRADEPILOT_MOCK=1). No live executor exists in this codebase.
@@ -213,15 +216,19 @@ export function computeDailySummary(db, now = new Date()) {
   const summaryDate = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
   const equity = getEquity({}, db);
   const open = getOpenPositions(db).length;
-  const prevClaude = getDailySpend(db, summaryDate, 'anthropic');
+  const prevSpend = getSpendByProvider(db, summaryDate);
+  const prevClaude = prevSpend.total; // all providers, not just Anthropic
   const prevPnl = pnlForDate(db, summaryDate);
-  const todayClaude = getDailySpend(db, today, 'anthropic');
+  const todaySpend = getSpendByProvider(db, today);
+  const todayClaude = todaySpend.total;
   const todayPnlVal = pnlForDate(db, today);
   const message =
     `📊 TradePilot-Futures summary for ${summaryDate} — EXECUTOR: FUTURES TESTNET (${config.leverage}x leverage)\n` +
     `equity now $${equity.toFixed(2)} | open positions ${open} | P&L on ${summaryDate} $${prevPnl.toFixed(2)}\n` +
-    `AI spend ${summaryDate}: claude $${prevClaude.toFixed(4)}\n` +
-    `today so far: P&L $${todayPnlVal.toFixed(2)} | claude $${todayClaude.toFixed(4)}`;
+    `AI spend ${summaryDate}: ${prevSpend.byProvider.length
+      ? prevSpend.byProvider.map((r) => `${r.provider} $${r.spend.toFixed(4)}`).join(' | ')
+      : 'none'}${prevSpend.byProvider.length > 1 ? ` | total $${prevSpend.total.toFixed(4)}` : ''}\n` +
+    `today so far: P&L $${todayPnlVal.toFixed(2)} | AI $${todayClaude.toFixed(4)}`;
   return { today, summaryDate, equity, open, prevClaude, prevPnl, message };
 }
 
@@ -337,6 +344,12 @@ export async function runCycle(db = getDb()) {
     console.error('funding accounting error:', err.message);
   }
 
+  // Shadow-mode evaluations for this cycle. Started after each pair's PRIMARY
+  // decision and deliberately NOT awaited there, so model comparison can never
+  // delay a stop, an exit or an entry. Drained at the very end of the cycle so
+  // the writes land before `--once` exits the process.
+  const shadowTasks = [];
+
   const volScale = volTargetScaleFromDb(db, config);
   if (volScale < 1) console.log(`volatility targeting: scaling new positions by ${volScale.toFixed(2)}`);
 
@@ -360,7 +373,26 @@ export async function runCycle(db = getDb()) {
         .prepare("SELECT exit_time, direction, pnl, exit_reason FROM trades WHERE pair = ? AND status = 'closed' ORDER BY id DESC LIMIT 3")
         .all(pair);
       const summary = buildMarketSummary(pair, market, recentCalls, recentTrades, context);
-      const regime = await getRegime(pair, summary, db);
+      // ONE id for this market state, created here and handed to BOTH paths.
+      // Neither the primary nor the shadow derives its own, so their rows
+      // join exactly on snapshot_id.
+      const snapshotId = createSnapshotId(summary);
+      const { regime, evaluation } = await evaluateRegime(pair, summary, db, Date.now(), { snapshotId });
+
+      // Shadow cadence FOLLOWS primary freshness. Shadow providers run only
+      // when the primary actually called a provider and got a usable regime
+      // for THIS snapshot — never on a cache hit, a decayed/stale regime, a
+      // budget skip, a missing key, a timeout, a provider error, a parse
+      // failure, or mock mode. Comparing a fresh shadow answer against a
+      // cached or fallback primary would be an invalid comparison, and would
+      // burn provider quota every cycle for nothing.
+      //
+      // The check happens BEFORE the task is created, and the call remains
+      // fire-and-forget: nothing below waits on it, and its result is never
+      // read by the trading path.
+      if (evaluation.fresh) {
+        shadowTasks.push(runShadowEvaluation({ pair, summary, snapshotId, db }));
+      }
 
       const actions = await runPairRules({
         pair,
@@ -414,6 +446,23 @@ export async function runCycle(db = getDb()) {
       } catch { /* never let logging kill the loop */ }
     }
   }
+
+  // Trading for every pair is finished by here; only now do we wait on the
+  // evaluation writes. allSettled + the module's own guards mean this cannot
+  // fail the cycle.
+  if (shadowTasks.length) {
+    try {
+      await Promise.allSettled(shadowTasks);
+    } catch { /* unreachable: allSettled never rejects */ }
+  }
+
+  // Cost bookkeeping, strictly after every trading decision has been made.
+  // OpenRouter's generation stats are not populated at response time, so the
+  // billed cost for a call is looked up on a LATER cycle. This never touches
+  // est_cost, the budget gate, or any trading state, and never throws.
+  try {
+    await reconcileOpenRouterCosts({ db });
+  } catch { /* unreachable: the module swallows everything */ }
 
   try {
     snapshotEquity(getEquity(prices, db), getCash(db), db);

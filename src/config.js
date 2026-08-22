@@ -76,17 +76,86 @@ export const config = {
   aiMaxStaleHours: num(process.env.AI_MAX_STALE_HOURS, 8),
 
   // --- AI layer ---
+  // Which registered provider serves PRIMARY regime calls (see
+  // src/ai/providers/). Anthropic is the only one registered today; an
+  // unknown value degrades to the engine's safe no-trade fallback rather
+  // than crashing the cycle. There is no automatic cross-provider fallback.
+  aiProvider: (process.env.AI_PROVIDER || 'anthropic').toLowerCase(),
   aiModel: process.env.AI_MODEL || 'claude-sonnet-4-6',
+  // The RAW generic model selector: '' when AI_MODEL was never set. Needed
+  // because `aiModel` above already folds in an Anthropic-specific default,
+  // which is not a valid id on providers that namespace their models (e.g.
+  // OpenRouter's `vendor/model`). Providers with their own default use this
+  // to honour an explicit AI_MODEL while ignoring the Anthropic fallback.
+  aiModelOverride: process.env.AI_MODEL || '',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   anthropicBase: process.env.ANTHROPIC_BASE || 'https://api.anthropic.com',
+  // --- shadow-mode model evaluation (OFF by default) ---
+  // When enabled, extra providers analyse the SAME market snapshot purely for
+  // comparison. Shadow results are written to ai_shadow_calls and are NEVER
+  // read by the trading path — only the primary provider can influence a
+  // regime, an entry, an exit or an order. Must be the literal string 'true'
+  // to enable: any other value (including 'TRUE', '1', typos) leaves it off.
+  aiShadowMode: process.env.AI_SHADOW_MODE === 'true',
+  aiShadowProviders: list(process.env.AI_SHADOW_PROVIDERS, []),
+
+  // --- Gemini (primary provider; NOT the default — AI_PROVIDER selects) ---
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  geminiBase: process.env.GEMINI_BASE || 'https://generativelanguage.googleapis.com',
+  // Explicit and configurable — never hard-coded at a call site. Verify the id
+  // against Google's current model list before enabling in production.
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  // Gemini 2.5 models think internally by default, and those tokens are drawn
+  // from the SAME maxOutputTokens budget as the visible answer — so a small
+  // budget can be spent entirely on hidden reasoning, returning empty text.
+  // Left UNSET by default (send no thinkingConfig, the standard request). Set
+  // GEMINI_THINKING_BUDGET=0 to disable thinking without a code change if
+  // empty/truncated responses show up in practice.
+  geminiThinkingBudget: process.env.GEMINI_THINKING_BUDGET === undefined || process.env.GEMINI_THINKING_BUDGET === ''
+    ? null
+    : Number(process.env.GEMINI_THINKING_BUDGET),
+
+  // --- OpenRouter (primary provider; NOT the default — AI_PROVIDER selects) ---
+  openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+  openrouterBase: process.env.OPENROUTER_BASE || 'https://openrouter.ai/api/v1',
+  // An EXPLICIT, stable model id — never a router/auto route, whose served
+  // model can vary between calls and would make attribution meaningless.
+  // AI_MODEL overrides this when set. Verify the id (and its real price) on
+  // OpenRouter before enabling: routes and availability change, and a "free"
+  // route is not assumed here.
+  openrouterModel: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
+
+  // --- Mistral (primary provider; NOT the default — AI_PROVIDER selects) ---
+  mistralApiKey: process.env.MISTRAL_API_KEY || '',
+  mistralBase: process.env.MISTRAL_BASE || 'https://api.mistral.ai/v1',
+  // PINNED to a concrete version (was the moving 'mistral-large-latest'
+  // alias). A moving alias can change the served model under a fixed
+  // configuration, which makes regime_calls.model meaningless for a
+  // reproducible comparison and leaves the price unverifiable.
+  //
+  // 'mistral-large-2512' is the API model id for Mistral Large 3 and the only
+  // priced Mistral entry in src/ai/pricing.js ($0.50/$1.50 per MTok, verified
+  // 2026-08-21). Any other Mistral model — including the documentation-style
+  // handle 'mistral-large-3-25-12' — resolves to 'unknown' pricing rather than
+  // borrowing this rate.
+  mistralModel: process.env.MISTRAL_MODEL || 'mistral-large-2512',
+
   groqApiKey: process.env.GROQ_API_KEY || '',
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
   aiDailyBudgetUsd: num(process.env.AI_DAILY_BUDGET_USD, 0.5),
   aiMaxOutputTokens: num(process.env.AI_MAX_OUTPUT_TOKENS, 1024),
-  pricing: {
-    inputPerMTok: num(process.env.AI_PRICE_INPUT_MTOK, 3.0),
-    outputPerMTok: num(process.env.AI_PRICE_OUTPUT_MTOK, 15.0),
-  },
+  // Hard ceiling on every outbound AI HTTP request (Claude + the Groq
+  // pre-filter). Without it a hung provider socket stalls the whole cycle:
+  // the GitHub Actions job has a 10-minute timeout, so a single wedged
+  // request can kill exits/stop management for every pair behind it. Matches
+  // alert.js's 10s convention; a timeout is treated as a provider failure and
+  // falls back to the safe no-trade path.
+  aiRequestTimeoutMs: num(process.env.AI_REQUEST_TIMEOUT_MS, 10_000),
+  // NOTE: there is deliberately NO global `pricing` object here any more.
+  // A single global rate silently mispriced every non-Anthropic provider.
+  // Prices now live in src/ai/pricing.js keyed by (provider, model), are not
+  // env-configurable (a price is a verified external fact, not a tunable),
+  // and an unknown pair resolves to 'unknown' rather than to a default.
   estInputTokens: num(process.env.AI_EST_INPUT_TOKENS, 2000),
   estOutputTokens: num(process.env.AI_EST_OUTPUT_TOKENS, 400),
   budgetDecayPoints: num(process.env.BUDGET_DECAY_POINTS, 20),

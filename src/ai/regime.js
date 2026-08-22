@@ -4,6 +4,9 @@
 // rule engine's job. In this futures fork a confident `bearish` call is
 // actionable (short entry), not just a "stay out" signal.
 import { config } from '../config.js';
+import { SYSTEM_PROMPT } from './prompt.js';
+import { getPrimaryProvider, tryGetPrimaryProvider } from './providers/index.js';
+import { PRICING_STATUS, resolvePricing } from './pricing.js';
 import { getDb, logEvent, nowIso } from '../db.js';
 import { mockTrend } from '../data/binance.js';
 import {
@@ -23,25 +26,9 @@ export const FALLBACK_REGIME = Object.freeze({
 
 const VALID_REGIMES = new Set(['bullish', 'bearish', 'chop']);
 
-const SYSTEM_PROMPT = [
-  'You are the market-regime analyst for a crypto paper-trading research system on FUTURES,',
-  'which can go LONG on bullish regimes and SHORT on bearish regimes.',
-  'You receive a compact JSON market summary for one trading pair.',
-  'Classify the current regime and decide whether the deterministic rule engine should be allowed to trade.',
-  'A confident bearish call enables short entries — it is a directional opinion, not just a risk-off flag.',
-  'Some pairs are precious metals (gold XAUUSDT, silver XAGUSDT). Metals are macro-driven, trend more smoothly than crypto, and are often uncorrelated with it — treat a clean metals trend as high-conviction.',
-  'For metals especially, favor trend continuation over counter-trend calls; their reversals are slower and cleaner than crypto\'s.',
-  'Goal: commit to a clear directional call whenever the evidence genuinely supports one. Do not retreat to "chop" out of excess caution when momentum, RSI, volume, and EMA alignment actually agree on a direction — a moderate-but-real edge is tradable.',
-  'When indicators align on a direction with decent momentum, lean bullish or bearish with confidence 55-75 rather than defaulting to chop.',
-  'But "chop" remains the honest answer in true sideways, conflicting, or low-conviction conditions. Never manufacture a signal that is not there — a forced trade is worse than no trade.',
-  'For SHORTS specifically: weight the risk of sharp counter-trend bounces and short squeezes. Require clean bearish structure (price below key EMAs, real downside momentum), not merely a pullback within an uptrend.',
-  'You do not size positions, set leverage, pick entries, or place orders.',
-  'Inside <thinking>, use at most 3 short bullet points (one line each).',
-  'Do not restate the input data; go straight to the regime judgment.',
-  'Then immediately close </thinking> and output the JSON.',
-  'After </thinking>, output ONLY valid raw JSON, no markdown, no code fences, exactly this schema:',
-  '{"regime":"bullish"|"bearish"|"chop","confidence":<integer 0-100>,"trade_allowed":true|false,"reasoning":"non-empty, max 2 sentences"}',
-].join(' ');
+// SYSTEM_PROMPT lives in ./prompt.js — single canonical definition, shared
+// with every primary provider. Re-exported here for existing importers.
+export { SYSTEM_PROMPT };
 
 // Clean truncation: an opened <thinking> that never closed (so no JSON could
 // follow). Distinct from a schema error on a complete response — the salvage
@@ -151,40 +138,37 @@ export function buildMarketSummary(pair, market, recentCalls = [], recentTrades 
   };
 }
 
-async function callClaude(summary, maxTokens = config.aiMaxOutputTokens) {
-  const res = await fetch(`${config.anthropicBase}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': config.anthropicApiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: config.aiModel,
-      max_tokens: maxTokens,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: JSON.stringify(summary) }],
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Anthropic API ${res.status}: ${body.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const text = (data.content || [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('');
-  return { text, usage: data.usage || { input_tokens: 0, output_tokens: 0 } };
+// Did this request die on our own request deadline rather than a provider
+// error? AbortSignal.timeout rejects with a DOMException named 'TimeoutError',
+// but Node/undici sometimes surfaces it wrapped (err.cause) or as a plain
+// abort, so check every shape. Used only to CLASSIFY the failure — a timeout
+// takes exactly the same safe fallback path as any other AI failure.
+export function isTimeoutError(err) {
+  if (!err) return false;
+  const names = [err.name, err.cause?.name].filter(Boolean);
+  if (names.some((n) => n === 'TimeoutError' || n === 'AbortError')) return true;
+  return /timed? ?out|aborted/i.test(String(err.message ?? ''));
+}
+
+// The primary regime request now goes through the provider registry: the
+// engine depends on the normalized interface
+//   { provider, model, text, usage: { inputTokens, outputTokens } }
+// and never on Anthropic specifics. Anthropic's own implementation (endpoint,
+// auth, anthropic-version, response extraction) lives in
+// src/ai/providers/anthropic.js. Parsing stays here, in parseRegimeResponse().
+async function callPrimaryProvider(provider, summary, maxTokens = config.aiMaxOutputTokens) {
+  return provider.complete({ summary, maxTokens });
 }
 
 // Optional free pre-filter: ask Groq whether anything materially changed.
 // Returns true ("call Claude") on any doubt or failure.
-async function groqSaysChanged(summary, lastSummaryJson) {
+async function groqSaysChanged(summary, lastSummaryJson, db = null, pair = null) {
   if (!config.groqApiKey || !lastSummaryJson) return true;
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      // Same bounded deadline as the Claude call.
+      signal: AbortSignal.timeout(config.aiRequestTimeoutMs),
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${config.groqApiKey}`,
@@ -207,7 +191,16 @@ async function groqSaysChanged(summary, lastSummaryJson) {
     const data = await res.json();
     const answer = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
     return !answer.startsWith('no');
-  } catch {
+  } catch (err) {
+    // Fails OPEN (returns true = "call Claude"): the pre-filter is an
+    // optional cost saver, never a gate on the real decision. A timeout is
+    // logged distinctly so a persistently slow Groq is diagnosable.
+    if (db) {
+      try {
+        logEvent(isTimeoutError(err) ? 'GROQ_TIMEOUT' : 'GROQ_ERROR',
+          { pair, timeoutMs: config.aiRequestTimeoutMs, error: String(err.message ?? err).slice(0, 200) }, db);
+      } catch { /* logging must never break the pre-filter */ }
+    }
     return true;
   }
 }
@@ -226,12 +219,26 @@ function decayed(row, points = config.budgetDecayPoints) {
   return { ...base, confidence: Math.max(0, base.confidence - points) };
 }
 
-function recordCall(db, pair, regime, summary, usage, estCost, source, rawText, ts = nowIso()) {
+// `usage` is the normalized provider shape: { inputTokens, outputTokens }.
+//
+// Three independent dimensions are persisted, never conflated:
+//   source   — the call OUTCOME/state (claude | claude_parse_fail |
+//              claude_error | claude_timeout | mock). Unchanged values, so
+//              every existing query/report keeps working.
+//   provider — WHO served it (anthropic | mock | ...), from the abstraction.
+//   model    — the EXACT model id, from the abstraction. Null when no model
+//              was actually selected; never a guess.
+function recordCall(db, {
+  pair, regime, summary, usage, estCost, source,
+  provider = null, model = null, snapshotId = null, pricingStatus = null,
+  generationId = null, rawText = null, ts = nowIso(),
+}) {
   db.prepare(
     `INSERT INTO regime_calls
        (ts, pair, regime, confidence, trade_allowed, reasoning, raw_json, summary_json,
-        input_tokens, output_tokens, est_cost, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        input_tokens, output_tokens, est_cost, source, provider, model, snapshot_id,
+        pricing_status, generation_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     ts,
     pair,
@@ -241,17 +248,74 @@ function recordCall(db, pair, regime, summary, usage, estCost, source, rawText, 
     regime.reasoning,
     rawText ?? JSON.stringify(regime),
     JSON.stringify(summary),
-    usage.input_tokens || 0,
-    usage.output_tokens || 0,
+    usage.inputTokens || 0,
+    usage.outputTokens || 0,
     estCost,
     source,
+    provider,
+    model,
+    snapshotId, // created once by the cycle; never re-hashed here
+    pricingStatus, // 'exact' | 'unknown' | null (no provider call was made)
+    generationId,  // provider-side id for later cost reconciliation only
   );
+}
+
+// Why a regime came back the way it did. This is EXPLICIT metadata, not
+// something callers should re-derive from timestamps, source strings, provider
+// names or confidence values. Exactly one outcome — FRESH — means "a real
+// configured primary provider was called and produced a valid regime for THIS
+// cycle's market summary"; everything else is a cache hit or a fallback.
+export const REGIME_OUTCOMES = Object.freeze({
+  FRESH: 'fresh',                       // provider called, response parsed
+  CACHED: 'cached',                     // inside the AI cadence window
+  CACHED_UNCHANGED: 'cached_unchanged',  // Groq pre-filter said nothing moved
+  BUDGET_SKIP: 'budget_skip',
+  MISSING_KEY: 'missing_key',
+  PARSE_FAILURE: 'parse_failure',        // provider answered, output unusable
+  TIMEOUT: 'timeout',
+  PROVIDER_ERROR: 'provider_error',
+  MOCK: 'mock',                          // synthetic regime, no provider call
+});
+
+// Structured, deduplicated-per-day signal about a pricing problem:
+//   PRICING_UNKNOWN — no verified price for this (provider, model)
+//   PRICING_STALE   — priced, but verified longer ago than the threshold
+// Deduplicated per (type, model, day) so a 15-minute cycle cannot flood the
+// events table. NEITHER ever blocks trading; both are purely observational.
+// Never throws: an accounting gap must not break a trading cycle.
+export function logPricingIssue(db, pricing, detail) {
+  const type = pricing.status === PRICING_STATUS.UNKNOWN
+    ? 'PRICING_UNKNOWN'
+    : pricing.status === PRICING_STATUS.STALE ? 'PRICING_STALE' : null;
+  if (!type) return null;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const seen = db.prepare(
+      `SELECT id FROM events WHERE type = ? AND ts >= ? AND detail LIKE ? LIMIT 1`,
+    ).get(type, `${today}T00:00:00`, `%"model":${JSON.stringify(detail.model ?? null)}%`);
+    if (!seen) {
+      logEvent(type, {
+        ...detail,
+        ...(pricing.verifiedOn ? { verifiedOn: pricing.verifiedOn } : {}),
+        ...(Number.isFinite(pricing.ageDays) ? { ageDays: Math.round(pricing.ageDays) } : {}),
+      }, db);
+    }
+  } catch { /* accounting must never break the cycle */ }
+  return type;
+}
+
+function evaluation(outcome, extra = {}) {
+  return { fresh: outcome === REGIME_OUTCOMES.FRESH, outcome, ...extra };
 }
 
 // Main entry: returns the regime the rule engine should use this cycle.
 // Respects AI cadence, the Groq pre-filter, and the hard daily budget cap.
 // `nowMs` is overridable so tests can run the cadence on sim time.
-export async function getRegime(pair, summary, db = getDb(), nowMs = Date.now()) {
+// `snapshotId` identifies the exact market state this evaluation was given.
+// It is CREATED BY THE CALLER (runCycle) and passed straight through to
+// storage — getRegime never derives one, so the primary row and the shadow
+// rows for the same summary always carry the identical value.
+export async function evaluateRegime(pair, summary, db = getDb(), nowMs = Date.now(), { snapshotId = null } = {}) {
   if (config.mock) {
     // Mock regime follows the synthetic trend of the pair, so demo cycles can
     // open a LONG on an uptrend pair and a SHORT on a downtrend pair.
@@ -264,8 +328,14 @@ export async function getRegime(pair, summary, db = getDb(), nowMs = Date.now())
         ? 'Mock regime: synthetic downtrend with sustained selling pressure.'
         : 'Mock regime: synthetic uptrend with healthy momentum.',
     };
-    recordCall(db, pair, mock, summary, { input_tokens: 0, output_tokens: 0 }, 0, 'mock', null, new Date(nowMs).toISOString());
-    return mock;
+    // Mock: provider 'mock' (a synthetic generator DID produce this row) but
+    // model NULL — no model was invoked, and inventing one would pollute
+    // model-level attribution exactly like a backfilled guess would.
+    recordCall(db, {
+      pair, regime: mock, summary, usage: { inputTokens: 0, outputTokens: 0 }, estCost: 0,
+      source: 'mock', provider: 'mock', model: null, snapshotId, pricingStatus: null, ts: new Date(nowMs).toISOString(),
+    });
+    return { regime: mock, evaluation: evaluation(REGIME_OUTCOMES.MOCK, { provider: 'mock', model: null }) };
   }
 
   const lastCall = db
@@ -275,36 +345,91 @@ export async function getRegime(pair, summary, db = getDb(), nowMs = Date.now())
 
   // Cadence: never call Claude more often than every aiCadenceHours per pair.
   if (lastCall && ageHours < config.aiCadenceHours) {
-    return rowToRegime(lastCall);
+    return {
+      regime: rowToRegime(lastCall),
+      evaluation: evaluation(REGIME_OUTCOMES.CACHED, { provider: lastCall.provider ?? null, model: lastCall.model ?? null, ageHours }),
+    };
   }
 
   // Groq pre-filter: skip Claude if nothing changed, unless the last call is
   // older than aiMaxStaleHours.
   if (lastCall && ageHours < config.aiMaxStaleHours) {
-    const changed = await groqSaysChanged(summary, lastCall.summary_json);
+    const changed = await groqSaysChanged(summary, lastCall.summary_json, db, pair);
     if (!changed) {
       logEvent('GROQ_SKIPPED', { pair, ageHours: Number(ageHours.toFixed(2)) }, db);
-      return rowToRegime(lastCall);
+      return {
+        regime: rowToRegime(lastCall),
+        evaluation: evaluation(REGIME_OUTCOMES.CACHED_UNCHANGED, { provider: lastCall.provider ?? null, model: lastCall.model ?? null, ageHours }),
+      };
     }
   }
 
-  // Hard daily budget cap.
-  const estCost = estimateCallCost();
-  warnIfBudgetMisconfigured(estCost, config.aiDailyBudgetUsd, 'anthropic', db);
-  if (wouldExceedBudget(estCost, config.aiDailyBudgetUsd, db)) {
-    logEvent('BUDGET_SKIPPED', { pair, estCost }, db);
-    return lastCall ? decayed(lastCall) : { ...FALLBACK_REGIME };
+  // Provider-agnostic credential pre-flight. Each provider declares its own
+  // key env var, so adding a provider can never leave a stale Anthropic-only
+  // check gating it. An UNKNOWN provider name is deliberately not handled
+  // here — it falls through to the main try below so it keeps its existing
+  // error/attribution behavior. Only the env var NAME is logged, never a key.
+  const configuredProvider = tryGetPrimaryProvider();
+  if (configuredProvider && !configuredProvider.isConfigured()) {
+    logEvent('AI_ERROR', { pair, error: `${configuredProvider.keyEnvVar} not set` }, db);
+    return {
+      regime: lastCall ? decayed(lastCall) : { ...FALLBACK_REGIME },
+      evaluation: evaluation(REGIME_OUTCOMES.MISSING_KEY, { provider: configuredProvider.name }),
+    };
   }
 
-  if (!config.anthropicApiKey) {
-    logEvent('AI_ERROR', { pair, error: 'ANTHROPIC_API_KEY not set' }, db);
-    return lastCall ? decayed(lastCall) : { ...FALLBACK_REGIME };
+  // Hard daily budget cap, priced for the provider/model that will ACTUALLY
+  // be called — never a global rate. When the price is unknown the dollar gate
+  // cannot be evaluated, so it is skipped rather than guessed.
+  //
+  // Skipping the dollar gate does NOT mean unbounded spend: primary calls are
+  // already bounded structurally, independent of pricing, by the AI cadence
+  // (one call per pair per AI_CADENCE_HOURS), the single truncation retry, and
+  // the per-cycle pair count. With the shipped defaults that ceiling is
+  // 17 pairs x (24/4) windows x 2 attempts = 204 calls/day worst case. No new
+  // control is needed; see PRICING_UNKNOWN events to spot an unpriced model.
+  const gateProviderName = configuredProvider?.name ?? config.aiProvider;
+  const gateModel = configuredProvider?.model ?? null;
+  const gatePricing = resolvePricing(gateProviderName, gateModel);
+  const estCost = estimateCallCost(gatePricing);
+  logPricingIssue(db, gatePricing, { pair, provider: gateProviderName, model: gateModel, stage: 'budget_gate' });
+  if (estCost !== null) warnIfBudgetMisconfigured(estCost, config.aiDailyBudgetUsd, gateProviderName, db);
+  if (estCost !== null && wouldExceedBudget(estCost, config.aiDailyBudgetUsd, db, undefined, gateProviderName)) {
+    logEvent('BUDGET_SKIPPED', { pair, provider: gateProviderName, estCost }, db);
+    return {
+      regime: lastCall ? decayed(lastCall) : { ...FALLBACK_REGIME },
+      evaluation: evaluation(REGIME_OUTCOMES.BUDGET_SKIP),
+    };
   }
 
+  // Attribution for whatever happens below, taken from the provider
+  // abstraction rather than hand-typed at each DB call site. Seeded with the
+  // CONFIGURED provider and a NULL model so that a failure during provider
+  // resolution records what was configured without claiming a model that was
+  // never actually selected.
+  const attribution = { provider: config.aiProvider, model: null };
   try {
-    let { text, usage } = await callClaude(summary);
-    let cost = costFromUsage(usage.input_tokens || 0, usage.output_tokens || 0);
-    addSpend(cost, db);
+    const provider = getPrimaryProvider();
+    attribution.provider = provider.name;
+    attribution.model = provider.model;
+
+    const first = await callPrimaryProvider(provider, summary);
+    let { text, usage } = first;
+    attribution.provider = first.provider ?? attribution.provider;
+    attribution.model = first.model ?? attribution.model;
+    // Recorded for later cost reconciliation ONLY — never used for pricing,
+    // attribution, or any trading decision. A retry supersedes it below.
+    attribution.generationId = first.generationId ?? null;
+    // Price the model that ACTUALLY answered. Unknown -> null cost, recorded
+    // as such and never added to any budget (and never priced at another
+    // provider's rate).
+    const pricing = resolvePricing(attribution.provider, attribution.model);
+    attribution.pricingStatus = pricing.status;
+    // STALE still produces a cost (an old price beats no price) and still
+    // accrues to the budget; it is flagged, never suppressed.
+    logPricingIssue(db, pricing, { pair, provider: attribution.provider, model: attribution.model, stage: 'primary_call' });
+    let cost = costFromUsage(usage.inputTokens || 0, usage.outputTokens || 0, pricing);
+    if (cost !== null) addSpend(cost, db, undefined, attribution.provider);
     const tsIso = new Date(nowMs).toISOString();
 
     let parsed = parseRegimeResponse(text);
@@ -314,31 +439,63 @@ export async function getRegime(pair, summary, db = getDb(), nowMs = Date.now())
     // retry exactly once with double the token ceiling.
     if (!parsed && isTruncatedThinking(text)) {
       logEvent('REGIME_PARSE_FAILURE', { pair, reason: 'truncated_thinking', raw: String(text).slice(0, 300) }, db);
-      const retry = await callClaude(summary, config.aiMaxOutputTokens * 2);
-      const retryCost = costFromUsage(retry.usage.input_tokens || 0, retry.usage.output_tokens || 0);
-      addSpend(retryCost, db);
+      const retry = await callPrimaryProvider(provider, summary, config.aiMaxOutputTokens * 2);
+      // The retry is a separate billable attempt: priced independently and
+      // added on top. Unknown pricing keeps BOTH attempts uncosted.
+      const retryCost = costFromUsage(retry.usage.inputTokens || 0, retry.usage.outputTokens || 0, pricing);
+      if (retryCost !== null) addSpend(retryCost, db, undefined, attribution.provider);
       logEvent('REGIME_RETRY', { pair, maxTokens: config.aiMaxOutputTokens * 2 }, db);
       text = retry.text;
       usage = retry.usage;
-      cost += retryCost;
+      attribution.generationId = retry.generationId ?? attribution.generationId;
+      cost = cost === null || retryCost === null ? null : cost + retryCost;
       parsed = parseRegimeResponse(text);
     }
 
     if (!parsed) {
       logEvent('REGIME_PARSE_FAILURE', { pair, raw: String(text).slice(0, 300) }, db);
       const fb = { ...FALLBACK_REGIME };
-      recordCall(db, pair, fb, summary, usage, cost, 'claude_parse_fail', text, tsIso);
-      return fb;
+      recordCall(db, {
+        pair, regime: fb, summary, usage, estCost: cost, source: 'claude_parse_fail',
+        ...attribution, snapshotId, rawText: text, ts: tsIso,
+      });
+      return { regime: fb, evaluation: evaluation(REGIME_OUTCOMES.PARSE_FAILURE, { ...attribution }) };
     }
-    recordCall(db, pair, parsed, summary, usage, cost, 'claude', text, tsIso);
-    return parsed;
+    recordCall(db, {
+      pair, regime: parsed, summary, usage, estCost: cost, source: 'claude',
+      ...attribution, snapshotId, rawText: text, ts: tsIso,
+    });
+    return { regime: parsed, evaluation: evaluation(REGIME_OUTCOMES.FRESH, { ...attribution }) };
   } catch (err) {
-    logEvent('AI_ERROR', { pair, error: String(err).slice(0, 300) }, db);
+    // A request that hit OUR deadline is logged as AI_TIMEOUT (distinct from
+    // a provider/network error) but takes the identical safe path below:
+    // decayed prior regime, or the no-trade chop fallback. Only err.message is
+    // recorded — never headers/config — so API keys can't leak into the DB.
+    const timedOut = isTimeoutError(err);
+    logEvent(timedOut ? 'AI_TIMEOUT' : 'AI_ERROR',
+      { pair, ...(timedOut ? { timeoutMs: config.aiRequestTimeoutMs } : {}), error: String(err.message ?? err).slice(0, 300) }, db);
     // Persist a row even on a network/API exception. Without this, lastCall
     // stays null forever and the 4h cadence gate above never engages — an
     // erroring key gets hammered every cycle instead of backing off.
     const fb = { ...FALLBACK_REGIME };
-    recordCall(db, pair, fb, summary, { input_tokens: 0, output_tokens: 0 }, 0, 'claude_error', String(err).slice(0, 300), new Date(nowMs).toISOString());
-    return lastCall ? decayed(lastCall) : fb;
+    recordCall(db, {
+      pair, regime: fb, summary, usage: { inputTokens: 0, outputTokens: 0 }, estCost: 0,
+      source: timedOut ? 'claude_timeout' : 'claude_error',
+      ...attribution, snapshotId, rawText: String(err.message ?? err).slice(0, 300),
+      ts: new Date(nowMs).toISOString(),
+    });
+    return {
+      regime: lastCall ? decayed(lastCall) : fb,
+      evaluation: evaluation(timedOut ? REGIME_OUTCOMES.TIMEOUT : REGIME_OUTCOMES.PROVIDER_ERROR, { ...attribution }),
+    };
   }
+}
+
+// Backward-compatible wrapper: returns ONLY the regime object, with exactly
+// the semantics the trading engine has always consumed. Every existing caller
+// keeps working unchanged; callers that need to know whether a fresh provider
+// call happened use evaluateRegime() instead.
+export async function getRegime(pair, summary, db = getDb(), nowMs = Date.now(), opts = {}) {
+  const { regime } = await evaluateRegime(pair, summary, db, nowMs, opts);
+  return regime;
 }

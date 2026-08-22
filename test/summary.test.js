@@ -45,7 +45,9 @@ test('daily summary reports the prior UTC day and is branded FUTURES TESTNET', (
   // with the spot bot's messages
   assert.match(s.message, /TradePilot-Futures summary for 2026-06-19/);
   assert.match(s.message, /EXECUTOR: FUTURES TESTNET \(\dx leverage\)/);
-  assert.match(s.message, /claude \$0\.1234/);
+  // Spend is now labelled per provider (a multi-provider run must never be
+  // reported as if it were all Claude).
+  assert.match(s.message, /anthropic \$0\.1234/);
   assert.match(s.message, /today so far/);
   db.close();
 });

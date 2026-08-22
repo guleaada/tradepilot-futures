@@ -17,7 +17,8 @@ import {
   unrealizedPnl,
   volTargetScaleFromDb,
 } from '../engine/portfolio.js';
-import { getDailySpend } from '../ai/budget.js';
+import { getDailySpend, getPricingUnknownCounts, getSpendByProvider } from '../ai/budget.js';
+import { getOpenRouterCostReconciliation } from '../ai/reconcile.js';
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -141,6 +142,10 @@ export function generateReport(db = getDb(), date = new Date().toISOString().sli
   const regimes = db.prepare('SELECT * FROM regime_calls ORDER BY id DESC LIMIT 10').all();
   const orders = db.prepare('SELECT * FROM orders ORDER BY id DESC LIMIT 20').all();
   const anthropicSpendToday = getDailySpend(db, date, 'anthropic');
+  // Per-provider, so a multi-provider run is never mislabelled as "Claude".
+  const spendToday = getSpendByProvider(db, date);
+  const unknownPricing = getPricingUnknownCounts(db, date);
+  const orCost = getOpenRouterCostReconciliation(db, date);
 
   const pct = (v) => (v === null ? 'n/a' : `${(v * 100).toFixed(1)}%`);
   const usd = (v) => `$${Number(v).toFixed(2)}`;
@@ -180,7 +185,21 @@ ${equityCurveSvg(stats.snapshots)}
 <tr><th>Expectancy / trade</th><td>${stats.expectancy === null ? 'n/a' : usd(stats.expectancy)}</td></tr>
 <tr><th>Max consecutive wins / losses</th><td>${stats.maxConsecWins} / ${stats.maxConsecLosses}</td></tr>
 <tr><th>Vol-targeting scale factor</th><td>${volTargetScaleFromDb(db).toFixed(2)}</td></tr>
-<tr><th>Today AI spend (Claude)</th><td>$${anthropicSpendToday.toFixed(4)}</td></tr>
+${spendToday.byProvider.length <= 1
+  // Anthropic-only production run keeps the familiar single line.
+  ? `<tr><th>Today AI spend (${esc(spendToday.byProvider[0]?.provider ?? 'anthropic')})</th><td>$${(spendToday.byProvider[0]?.spend ?? anthropicSpendToday).toFixed(4)}</td></tr>`
+  : spendToday.byProvider.map((r) => `<tr><th>Today AI spend — ${esc(r.provider)}</th><td>$${r.spend.toFixed(4)}</td></tr>`).join('\n')
+    + `<tr><th>Today AI spend — total</th><td>$${spendToday.total.toFixed(4)}</td></tr>`}
+${unknownPricing.length
+  ? unknownPricing.map((r) => `<tr><th>Pricing unknown — ${esc(r.provider)}</th><td>${r.n} call${r.n === 1 ? '' : 's'}</td></tr>`).join('\n')
+  : ''}
+${orCost && orCost.calls
+  // Estimated (requested model) vs reconciled actual (OpenRouter billing).
+  // Unreconciled calls are shown as such — never folded into the actual.
+  ? `<tr><th>OpenRouter — estimated</th><td>$${Number(orCost.estimated).toFixed(6)}</td></tr>`
+    + `<tr><th>OpenRouter — actual (reconciled ${orCost.reconciled_calls}/${orCost.calls})</th><td>$${Number(orCost.actual_reconciled).toFixed(6)}</td></tr>`
+    + (orCost.unreconciled_calls ? `<tr><th>OpenRouter — awaiting reconciliation</th><td>${orCost.unreconciled_calls} call${orCost.unreconciled_calls === 1 ? '' : 's'}</td></tr>` : '')
+  : ''}
 <tr><th>Total AI spend</th><td>$${stats.totalAiSpend.toFixed(4)}</td></tr>
 </table>
 
@@ -240,12 +259,14 @@ export function consoleSummary(prices = {}, db = getDb()) {
   const equity = getEquity(prices, db);
   const cash = getCash(db);
   const open = getOpenPositions(db);
-  const claudeSpend = getDailySpend(db, undefined, 'anthropic');
+  const spend = getSpendByProvider(db);
   const pnl = todayPnl(db);
   const lines = [
     '── TradePilot-Futures cycle summary ' + '─'.repeat(22),
     `EXECUTOR: FUTURES TESTNET (${config.leverage}x leverage) — no real funds`,
-    `equity: $${equity.toFixed(2)}   cash: $${cash.toFixed(2)}   margin locked: $${getMarginLocked(db).toFixed(2)}   today P&L: $${pnl.toFixed(2)}   today AI spend: $${claudeSpend.toFixed(4)}`,
+    `equity: $${equity.toFixed(2)}   cash: $${cash.toFixed(2)}   margin locked: $${getMarginLocked(db).toFixed(2)}   today P&L: $${pnl.toFixed(2)}   today AI spend: ${spend.byProvider.length <= 1
+      ? '$' + (spend.byProvider[0]?.spend ?? 0).toFixed(4)
+      : spend.byProvider.map((r) => r.provider + ' $' + r.spend.toFixed(4)).join(' | ') + ' | total $' + spend.total.toFixed(4)}`,
   ];
   if (open.length) {
     for (const p of open) {
