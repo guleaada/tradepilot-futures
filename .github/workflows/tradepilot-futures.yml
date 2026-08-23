@@ -3,7 +3,18 @@ name: TradePilot-Futures cycle
 on:
   schedule:
     - cron: '*/15 * * * *'
-  workflow_dispatch: {}
+  # Manual runs only. Opts THIS ONE RUN into a shadow-only model comparison.
+  # Shadow providers never trade (safety contract: src/ai/shadow.js) and the
+  # scheduled cron never supplies these inputs, so its environment is unchanged.
+  workflow_dispatch:
+    inputs:
+      shadow_provider:
+        type: choice
+        default: none
+        required: false
+        options:
+          - none
+          - mistral
 
 # Serialize cycles: a run that starts while another holds the group QUEUES
 # rather than overlapping (cancel-in-progress: false keeps the in-flight run).
@@ -62,6 +73,22 @@ jobs:
           # Optional: Telegram alerts (no-op when unset).
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # --- manual shadow-test wiring (no effect on scheduled runs) ---
+          # Anthropic is pinned as the PRIMARY (decision-making) provider for
+          # every run. This restates the code default in src/config.js
+          # (`AI_PROVIDER || 'anthropic'`), so it changes no behavior; it is
+          # spelled out so a shadow selection can never become the primary.
+          AI_PROVIDER: anthropic
+          # The three below resolve to '' on scheduled runs and on a manual run
+          # with shadow_provider=none. Empty is handled exactly like unset:
+          #   AI_SHADOW_MODE      -> compared === 'true'  -> false
+          #   AI_SHADOW_PROVIDERS -> list('', [])         -> []
+          #   MISTRAL_API_KEY     -> '' -> isConfigured() false, no HTTP call
+          # So shadow mode stays OFF and the Mistral secret is never placed in
+          # the job environment unless a human picks 'mistral' on a manual run.
+          AI_SHADOW_MODE: "${{ github.event.inputs.shadow_provider == 'mistral' && 'true' || '' }}"
+          AI_SHADOW_PROVIDERS: "${{ github.event.inputs.shadow_provider == 'mistral' && 'mistral' || '' }}"
+          MISTRAL_API_KEY: "${{ github.event.inputs.shadow_provider == 'mistral' && secrets.MISTRAL_API_KEY || '' }}"
         run: npm run cycle
 
       - name: Generate report

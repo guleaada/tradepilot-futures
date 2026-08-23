@@ -65,22 +65,27 @@ export const PRICING = Object.freeze({
     },
   },
   mistral: {
-    // Mistral Large 3, pinned away from the moving 'mistral-large-latest'
-    // alias so regime_calls.model identifies exactly what ran.
-    // 'mistral-large-2512' is the API model id (date-suffix convention, cf.
-    // the deprecated 'mistral-large-2411' = Nov 2024).
+    // Mistral Large 3. Re-verified 2026-08-22 (UTC) against Mistral's own docs: the
+    // model card publishes this model's API names as
+    //   {"names":["mistral-large-2512","mistral-large-latest"]}
+    // so 'mistral-large-2512' IS the concrete API model id and
+    // 'mistral-large-latest' is its MOVING alias. 'mistral-large-3-25-12' is
+    // only the docs URL slug (docs.mistral.ai/models/mistral-large-3-25-12),
+    // never an API id. Neither the alias nor the slug is registered here:
+    // both resolve to 'unknown', like any other unrecognised model.
     //
-    // Price verified from Mistral's official pricing page: "Mistral Large
-    // costs $0.5 /M tokens in and $1.5 /M tokens out".
+    // Rates are from the official per-model pricing table, which lists
+    // Mistral Large 3 at input $0.5, cached input $0.05, output $1.5 per MTok.
+    // Only the STANDARD input rate is registered: this repo sends no caching
+    // directives, so a server-side cache hit can only make the real bill lower
+    // than est_cost. The estimate is an upper bound, never optimistic.
     //
-    // This is the ONLY priced Mistral entry. The documentation-style handle
-    // 'mistral-large-3-25-12' is deliberately NOT registered: it is not the
-    // API model id, and pricing a string the API does not accept would put a
-    // confident cost against a call that never happens. It therefore resolves
-    // to 'unknown' like any other unrecognised model.
+    // Thinking/reasoning chunks are stripped from the response TEXT, but their
+    // tokens remain in usage.completion_tokens and are billed as output —
+    // exactly how outputPerMTok is applied here.
     'mistral-large-2512': {
       inputPerMTok: 0.50, outputPerMTok: 1.50,
-      verifiedOn: '2026-08-21', source: 'mistral.ai/pricing',
+      verifiedOn: '2026-08-22', source: 'docs.mistral.ai/inference/pricing',
     },
   },
 });

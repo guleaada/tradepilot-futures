@@ -11,7 +11,8 @@
     "start": "node src/index.js",
     "cycle": "node src/index.js --once",
     "report": "node src/report/daily.js",
-    "test": "node --test"
+    "test": "node --test",
+    "shadow-analysis": "node src/report/shadow.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

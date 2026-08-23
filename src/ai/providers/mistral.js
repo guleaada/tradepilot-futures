@@ -85,8 +85,9 @@ export const mistralProvider = {
 
     // Usage is OpenAI-shaped. Absent usage reads as 0 — the same safe
     // representation the other providers use; token counts are never invented.
-    // NOTE: cost is still computed with the repo's Anthropic pricing
-    // constants; provider-specific pricing is a later step.
+    // prompt_tokens/completion_tokens are the billable counts Mistral meters,
+    // and cost is resolved per (provider, model) in ../pricing.js — never from
+    // a global or Anthropic-derived rate.
     const usage = data.usage || {};
     return {
       provider: 'mistral',
