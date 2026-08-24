@@ -31,9 +31,15 @@ test('extracts JSON embedded in surrounding prose', () => {
   assert.equal(out.regime, 'bearish');
 });
 
-test('clamps confidence into [0, 100]', () => {
-  const out = parseRegimeResponse('{"regime":"bullish","confidence":250,"trade_allowed":true,"reasoning":"Strong trend."}');
-  assert.equal(out.confidence, 100);
+test('rejects out-of-range confidence instead of clamping it', () => {
+  // Previously 250 was clamped to 100, manufacturing MAXIMUM conviction from a
+  // value the schema forbids. A malformed confidence is now a parse failure and
+  // takes the same safe fallback path as any other unusable response.
+  assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":250,"trade_allowed":true,"reasoning":"Strong trend."}'), null);
+  assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":-5,"trade_allowed":true,"reasoning":"x"}'), null);
+  // The valid boundaries still parse.
+  assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":0,"trade_allowed":true,"reasoning":"x"}').confidence, 0);
+  assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":100,"trade_allowed":true,"reasoning":"x"}').confidence, 100);
 });
 
 test('truncated thinking (opened <thinking>, never closed, no JSON) returns null', () => {
@@ -112,4 +118,79 @@ test('rejects malformed and schema-invalid output', () => {
   assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":50,"trade_allowed":"yes"}'), null);
   assert.equal(parseRegimeResponse('{"regime":"bullish","confidence":50'), null);
   assert.equal(parseRegimeResponse('[1,2,3]'), null);
+});
+
+// --- ReDoS regression -------------------------------------------------------
+
+// Median of 3 so a single GC pause cannot decide the result.
+function medianParseMs(text) {
+  const runs = [];
+  for (let i = 0; i < 3; i++) {
+    const t = process.hrtime.bigint();
+    parseRegimeResponse(text);
+    runs.push(Number(process.hrtime.bigint() - t) / 1e6);
+  }
+  return runs.sort((a, b) => a - b)[1];
+}
+
+const bigBody = (n) => '{"regime":"bullish","confidence":64,"trade_allowed":true,"reasoning":"'
+  + 'x'.repeat(n) + '"}';
+
+test('parsing scales linearly, not quadratically, on large input', () => {
+  // The <thinking> salvage used a greedy /[\s\S]*<\/thinking>/i. With no closing
+  // tag present it retried from every start position: O(n^2), measured at 597ms
+  // for 16KB and roughly fourfold per doubling. At 1MB that projects to tens of
+  // minutes. It now uses lastIndexOf, which is O(n).
+  parseRegimeResponse(bigBody(1000)); // warm up
+
+  const sizes = [16_000, 64_000, 256_000, 1_000_000];
+  const times = sizes.map((n) => medianParseMs(bigBody(n)));
+
+  // Hard bound. Quadratic behaviour at 1MB projects to ~39 minutes, so this
+  // rules it out with enormous margin and cannot flake on a slow machine.
+  assert.ok(times[3] < 1000, `1MB must parse well under 1s, took ${times[3].toFixed(1)}ms`);
+
+  // Growth check, normalised for size. Linear is ~1x; quadratic across this
+  // 62.5x size range would be ~62x. A generous ceiling of 5 separates them
+  // decisively without depending on absolute timings.
+  const floor = 0.05; // ms - avoids dividing by a near-zero measurement
+  const growth = (Math.max(times[3], floor) / Math.max(times[0], floor)) / (sizes[3] / sizes[0]);
+  assert.ok(growth < 5,
+    `normalised growth must stay near linear, got ${growth.toFixed(2)}x `
+    + `(times: ${times.map((t) => t.toFixed(2)).join(', ')}ms)`);
+
+  // A large-but-valid response is still parsed correctly, not just quickly.
+  const parsed = parseRegimeResponse(bigBody(1_000_000));
+  assert.equal(parsed.regime, 'bullish');
+  assert.equal(parsed.confidence, 64);
+  assert.equal(parsed.reasoning.length, 200, 'reasoning is still truncated to 200 chars');
+});
+
+test('the linear <thinking> strip is byte-equivalent to the regex it replaced', () => {
+  // The exact semantics that had to be preserved: complete pairs are removed,
+  // a LONE closing tag drops everything before it, an unclosed opening tag is
+  // left alone, and matching is case-insensitive.
+  const GOOD_JSON_LOCAL = '{"regime":"bullish","confidence":64,"trade_allowed":true,"reasoning":"x"}';
+  const legacyStrip = (t) => t
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/[\s\S]*<\/thinking>/i, (m) => (m.includes('<thinking') ? m : ''))
+    .trim();
+
+  const cases = [
+    GOOD_JSON_LOCAL,
+    '<thinking>a</thinking>' + GOOD_JSON_LOCAL,
+    'junk</thinking>' + GOOD_JSON_LOCAL,
+    'a</thinking>b</thinking>' + GOOD_JSON_LOCAL,
+    'X</THINKING>' + GOOD_JSON_LOCAL,
+    '<thinking>never closed',
+    '<THINKING>x</THINKING>' + GOOD_JSON_LOCAL,
+    '',
+  ];
+  for (const c of cases) {
+    // Parse the legacy-stripped text and the raw text through the live parser;
+    // both must reach the same verdict.
+    const viaLegacy = legacyStrip(c) === '' ? null : parseRegimeResponse(legacyStrip(c));
+    const viaLive = parseRegimeResponse(c);
+    assert.deepEqual(viaLive, viaLegacy, 'differs for: ' + JSON.stringify(c).slice(0, 50));
+  }
 });

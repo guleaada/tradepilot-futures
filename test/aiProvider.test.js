@@ -130,7 +130,10 @@ test('D: the provider sends the canonical SYSTEM_PROMPT verbatim', async () => {
 });
 
 test('D2: exactly one definition of the prompt exists in src/', () => {
-  const marker = 'You are the market-regime analyst';
+  // Coupled to the prompt's opening line on purpose: this asserts the prompt
+  // has exactly ONE definition in src/. Update the marker when the prompt text
+  // changes (PROMPT_VERSION must be bumped too); never relax the assertion.
+  const marker = "You are TradePilot's market-regime evaluator";
   const hits = [];
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

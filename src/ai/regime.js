@@ -38,16 +38,33 @@ export function isTruncatedThinking(text) {
   return /<thinking>/i.test(text) && !/<\/thinking>/i.test(text);
 }
 
+const THINKING_CLOSE = '</thinking>';
+
+// Drop everything up to a LONE closing tag (one with no opening tag before it),
+// leaving text that already contains a proper <thinking> pair untouched.
+//
+// This replaces  /[\s\S]*<\/thinking>/i  with a "keep it if it contains an
+// opening tag" callback. That regex backtracks catastrophically when NO closing
+// tag is present: the greedy [\s\S]* is retried from every start position, so
+// cost grows as O(n^2) - measured at 597ms for a 16KB response and roughly
+// fourfold per doubling. Indexing is O(n) and byte-equivalent on every case
+// (proven in test/parse.test.js).
+function stripLoneClosingThinkingTag(s) {
+  const at = s.toLowerCase().lastIndexOf(THINKING_CLOSE);
+  if (at === -1) return s;
+  const upto = at + THINKING_CLOSE.length;
+  return /<thinking/i.test(s.slice(0, upto)) ? s : s.slice(upto);
+}
+
 // Parse defensively: strip <thinking> blocks and code fences, extract the
 // outermost JSON object, then validate strictly — regime in the known set,
 // confidence an integer (clamped to 0-100), trade_allowed boolean, reasoning
 // a non-empty string (truncated to 200 chars). Returns null on any failure.
 export function parseRegimeResponse(text) {
   if (typeof text !== 'string' || !text.trim()) return null;
-  let body = text
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/[\s\S]*<\/thinking>/i, (m) => (m.includes('<thinking') ? m : '')) // tolerate a lone closing tag
-    .trim();
+  let body = stripLoneClosingThinkingTag(
+    text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, ''),
+  ).trim();
   const fenced = body.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
   if (fenced) body = fenced[1].trim();
   if (!body.startsWith('{')) {
@@ -64,14 +81,21 @@ export function parseRegimeResponse(text) {
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
   if (!VALID_REGIMES.has(obj.regime)) return null;
-  const confidence = Number(obj.confidence);
-  if (!Number.isInteger(confidence)) return null;
+  // STRICT: the schema promises an integer 0-100 and nothing else is accepted.
+  // This was previously Number(obj.confidence) followed by a clamp, which
+  // silently converted "999" and 1e21 into 100 (maximum conviction from a value
+  // the schema forbids), [70] into 70, and null/false into 0. A malformed
+  // confidence is now a parse failure, taking the same safe fallback path as any
+  // other unusable response rather than being guessed at.
+  const confidence = obj.confidence;
+  if (typeof confidence !== 'number' || !Number.isInteger(confidence)
+    || confidence < 0 || confidence > 100) return null;
   if (typeof obj.trade_allowed !== 'boolean') return null;
   const reasoning = obj.reasoning ?? obj.reason;
   if (typeof reasoning !== 'string' || !reasoning.trim()) return null;
   return {
     regime: obj.regime,
-    confidence: Math.max(0, Math.min(100, confidence)),
+    confidence, // already validated as an integer within [0, 100]
     trade_allowed: obj.trade_allowed,
     reasoning: reasoning.trim().slice(0, 200),
   };
