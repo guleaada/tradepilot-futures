@@ -148,7 +148,7 @@ test('C: a new Anthropic call persists provider=anthropic and the configured mod
     usage: { input_tokens: 1500, output_tokens: 80 },
   });
   try {
-    await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test', aiModel: 'claude-sonnet-4-6', groqApiKey: '' },
+    await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test', aiModel: 'claude-sonnet-4-6', groqApiKey: '' },
       () => getRegime('BTCUSDT', { pair: 'BTCUSDT' }, db));
     const row = db.prepare('SELECT * FROM regime_calls ORDER BY id DESC LIMIT 1').get();
     assert.equal(row.provider, 'anthropic');
@@ -167,7 +167,7 @@ test('C2: attribution follows the configured model, not a hard-coded constant', 
   const saved = globalThis.fetch;
   globalThis.fetch = async () => jsonResponse({ content: [{ type: 'text', text: GOOD_JSON }], usage: { input_tokens: 1, output_tokens: 1 } });
   try {
-    await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test', aiModel: 'claude-opus-4-1-some-future-id', groqApiKey: '' },
+    await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test', aiModel: 'claude-opus-4-1-some-future-id', groqApiKey: '' },
       () => getRegime('ETHUSDT', { pair: 'ETHUSDT' }, db));
     assert.equal(db.prepare('SELECT model FROM regime_calls ORDER BY id DESC LIMIT 1').get().model, 'claude-opus-4-1-some-future-id');
   } finally {
@@ -193,7 +193,7 @@ test('D: failure outcomes keep provider/model while source carries the outcome',
   const saved = globalThis.fetch;
   globalThis.fetch = async () => new Response('boom', { status: 500 });
   try {
-    await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test', aiModel: 'claude-sonnet-4-6', groqApiKey: '' },
+    await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test', aiModel: 'claude-sonnet-4-6', groqApiKey: '' },
       () => getRegime('BTCUSDT', { pair: 'BTCUSDT' }, db));
     const row = db.prepare('SELECT source, provider, model FROM regime_calls ORDER BY id DESC LIMIT 1').get();
     // three independent dimensions on one row

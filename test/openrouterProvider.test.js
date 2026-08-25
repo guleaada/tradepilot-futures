@@ -317,8 +317,8 @@ test('K: OpenRouter failure NEVER contacts Anthropic or Gemini', async () => {
 
 // --- L. deterministic selection -----------------------------------------
 
-test('L: AI_PROVIDER=openrouter always selects OpenRouter; Anthropic stays the default', () => {
-  assert.equal(config.aiProvider, 'anthropic', 'shipped default is Anthropic');
+test('L: AI_PROVIDER=openrouter always selects OpenRouter; Gemini is the default', () => {
+  assert.equal(config.aiProvider, 'gemini', 'shipped default is Gemini');
   for (let i = 0; i < 5; i++) assert.equal(getPrimaryProvider('openrouter'), openrouterProvider);
   assert.equal(getPrimaryProvider('openrouter').name, 'openrouter');
   assert.equal(getPrimaryProvider('OpenRouter').name, 'openrouter', 'case-insensitive, still deterministic');

@@ -83,8 +83,11 @@ test('a network/API exception persists a row so the 4h cadence gate re-engages',
   const db = openDb(':memory:');
   const origMock = config.mock;
   const origKey = config.anthropicApiKey;
+  const origProvider = config.aiProvider;
   const origFetch = globalThis.fetch;
   config.mock = false;
+  // Exercises the ANTHROPIC provider specifically.
+  config.aiProvider = 'anthropic';
   config.anthropicApiKey = 'bad-key';
   let fetchCalls = 0;
   globalThis.fetch = async () => { fetchCalls++; throw new Error('simulated network/auth failure'); };
@@ -104,6 +107,7 @@ test('a network/API exception persists a row so the 4h cadence gate re-engages',
   } finally {
     config.mock = origMock;
     config.anthropicApiKey = origKey;
+    config.aiProvider = origProvider;
     globalThis.fetch = origFetch;
   }
   db.close();

@@ -106,6 +106,9 @@ test('migration is idempotent — reopening changes nothing', () => {
 // --- 2. workflow wiring -----------------------------------------------------
 
 const WORKFLOW = fs.readFileSync(new URL('../.github/workflows/tradepilot-futures.yml', import.meta.url), 'utf8');
+// Comments stripped: an explanatory comment naming a secret is documentation,
+// not a capability, and must not fail an "is it reachable" assertion.
+const WORKFLOW_CODE = WORKFLOW.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
 
 // GitHub expression semantics for `cond && value || ''`:
 // `a && b` yields a when a is falsy, else b; `a || b` yields a when truthy,
@@ -125,8 +128,11 @@ const envValue = (name) => {
   return m[1];
 };
 
-test('workflow: AI_PROVIDER is anthropic unconditionally', () => {
-  assert.equal(envValue('AI_PROVIDER'), 'anthropic', 'not an expression — it cannot vary by input');
+test('workflow: AI_PROVIDER is gemini unconditionally', () => {
+  // REQUIREMENT 1 + 2: scheduled runs use Gemini, and Gemini is authoritative.
+  // A literal, not an expression, so no workflow input can vary it.
+  assert.equal(envValue('AI_PROVIDER'), 'gemini');
+  assert.doesNotMatch(envValue('AI_PROVIDER'), /\$\{\{/, 'must be a literal, not an expression');
 });
 
 test('workflow: shadow_provider=none yields empty shadow wiring', () => {
@@ -139,7 +145,7 @@ test('workflow: shadow_provider=mistral enables shadow and supplies the secret',
   assert.equal(evaluateGithubTernary(envValue('AI_SHADOW_MODE'), 'mistral'), 'true');
   assert.equal(evaluateGithubTernary(envValue('AI_SHADOW_PROVIDERS'), 'mistral'), 'mistral');
   assert.match(envValue('MISTRAL_API_KEY'), /secrets\.MISTRAL_API_KEY/, 'a secret REFERENCE, never a literal');
-  assert.equal(envValue('AI_PROVIDER'), 'anthropic', 'primary is unchanged even with shadow on');
+  assert.equal(envValue('AI_PROVIDER'), 'gemini', 'primary is unchanged even with shadow on');
 });
 
 test('workflow: a SCHEDULED run can never enable the Mistral shadow', () => {
@@ -158,10 +164,14 @@ test('workflow: the manual input defaults to none and offers only none|mistral',
   assert.match(WORKFLOW, /default:\s*none/);
   const options = WORKFLOW.slice(WORKFLOW.indexOf('options:')).split('\n').slice(1, 3).map((l) => l.trim());
   assert.deepEqual(options, ['- none', '- mistral']);
-  // No other provider secret may be exposed by this workflow.
-  for (const s of ['GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'GOOGLE_API_KEY']) {
-    assert.ok(!WORKFLOW.includes(s), `${s} must not appear`);
+  // GEMINI_API_KEY is now the PRIMARY provider's key and is legitimately
+  // present. No OTHER provider secret may be exposed, and Anthropic's must be
+  // gone entirely (requirement 10).
+  for (const name of ['OPENROUTER_API_KEY', 'GOOGLE_API_KEY', 'ANTHROPIC_API_KEY']) {
+    assert.ok(!WORKFLOW_CODE.includes(name), `${name} must not appear in workflow code`);
   }
+  assert.match(WORKFLOW, /GEMINI_API_KEY: \$\{\{ secrets\.GEMINI_API_KEY \}\}/,
+    'the primary key is supplied as a secret reference');
 });
 
 // --- 3. --status diagnostic -------------------------------------------------
@@ -212,4 +222,61 @@ test('status output exposes names and counts only — never a secret', () => {
   const src = fs.readFileSync(new URL('../src/report/shadow.js', import.meta.url), 'utf8');
   const body = src.slice(src.indexOf('export function renderStatus'), src.indexOf('export const USAGE'));
   assert.ok(!/apiKey|API_KEY|secret/i.test(body), 'renderStatus references no credential field');
+});
+
+// =========================================================================
+// Provider-selection contract: Gemini primary (requirements 1-10)
+// =========================================================================
+
+test('R3 + R4: Mistral is shadow-only and Groq is not a provider at all', async () => {
+  const { listPrimaryProviders, tryGetPrimaryProvider } = await import('../src/ai/providers/index.js');
+  // Mistral IS registered (it can be a shadow) but the workflow never selects it
+  // as primary. Groq is not in the registry at all - it is an optional
+  // pre-filter (groqSaysChanged), structurally incapable of being primary.
+  assert.deepEqual(listPrimaryProviders().sort(), ['anthropic', 'gemini', 'mistral', 'openrouter']);
+  assert.ok(tryGetPrimaryProvider('mistral'), 'mistral is a registered provider');
+  assert.ok(!tryGetPrimaryProvider('groq'), 'groq is NOT a primary provider');
+  assert.ok(!tryGetPrimaryProvider('GROQ'));
+  assert.ok(!tryGetPrimaryProvider('grok'));
+  // Groq appears in the workflow only as an optional pre-filter key.
+  assert.match(WORKFLOW, /GROQ_API_KEY: \$\{\{ secrets\.GROQ_API_KEY \}\}/);
+  assert.doesNotMatch(WORKFLOW, /AI_PROVIDER:\s*(groq|mistral)/i);
+});
+
+test('R5: no workflow input can make Mistral or Groq primary', () => {
+  // AI_PROVIDER is a literal. The only input is shadow_provider, and it feeds
+  // ONLY the three shadow variables - never AI_PROVIDER.
+  assert.equal(envValue('AI_PROVIDER'), 'gemini');
+  const inputDriven = [...WORKFLOW.matchAll(/^\s*([A-Z_]+):\s*"\$\{\{[^}]*shadow_provider[^}]*\}\}"/gm)]
+    .map((m) => m[1]).sort();
+  assert.deepEqual(inputDriven, ['AI_SHADOW_MODE', 'AI_SHADOW_PROVIDERS', 'MISTRAL_API_KEY'],
+    'only the shadow wiring may depend on the input');
+  assert.ok(!inputDriven.includes('AI_PROVIDER'), 'AI_PROVIDER must never be input-driven');
+  // Every option the UI offers, checked against the primary.
+  for (const input of [null, 'none', 'mistral']) {
+    assert.equal(envValue('AI_PROVIDER'), 'gemini', `primary must stay gemini for input=${input}`);
+  }
+});
+
+test('R9 + R10: Anthropic is neither required nor reachable in production', () => {
+  // Requirement 9: not required - no Anthropic env mapping and no secret
+  // reference survive anywhere in the executable part of the workflow.
+  assert.ok(!WORKFLOW_CODE.includes('ANTHROPIC'), 'no Anthropic reference in workflow code');
+  // Requirement 10: not reachable - the secret is never handed to the job, so
+  // the provider's pre-flight refuses before any HTTP request is built.
+  assert.doesNotMatch(WORKFLOW, /secrets\.ANTHROPIC_API_KEY/, 'the secret is never referenced, even in a comment');
+  assert.doesNotMatch(WORKFLOW_CODE, /^\s*ANTHROPIC_API_KEY:/m, 'no env mapping');
+});
+
+test('R10: without ANTHROPIC_API_KEY the Anthropic provider cannot issue a request', async () => {
+  const { config } = await import('../src/config.js');
+  const { anthropicProvider } = await import('../src/ai/providers/index.js');
+  const saved = config.anthropicApiKey;
+  config.anthropicApiKey = '';           // exactly the production job environment
+  try {
+    assert.equal(anthropicProvider.isConfigured(), false,
+      'pre-flight must fail, so no HTTP request is ever constructed');
+  } finally {
+    config.anthropicApiKey = saved;
+  }
 });

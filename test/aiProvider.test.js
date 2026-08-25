@@ -52,7 +52,7 @@ async function withConfig(overrides, fn) {
 
 test('A: Anthropic provider returns the normalized shape with real usage and model', async () => {
   const fetchImpl = recordingFetch(() => jsonResponse(claudeBody(GOOD_JSON, { input_tokens: 1234, output_tokens: 56 })));
-  const out = await withConfig({ aiModel: 'claude-sonnet-4-6', anthropicApiKey: 'sk-ant-test', anthropicBase: 'https://api.anthropic.com' },
+  const out = await withConfig({ aiProvider: 'anthropic', aiModel: 'claude-sonnet-4-6', anthropicApiKey: 'sk-ant-test', anthropicBase: 'https://api.anthropic.com' },
     () => anthropicProvider.complete({ summary: { pair: 'BTCUSDT' }, fetchImpl }));
 
   assert.equal(out.provider, 'anthropic');
@@ -95,7 +95,7 @@ test('B: a non-2xx throws the existing error shape and reaches the safe fallback
   const savedFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response('boom', { status: 500 });
   try {
-    const regime = await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test' },
+    const regime = await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test' },
       () => getRegime('BTCUSDT', { pair: 'BTCUSDT' }, db));
     assert.deepEqual(regime, { ...FALLBACK_REGIME });
     assert.equal(regime.trade_allowed, false);
@@ -191,7 +191,7 @@ test('F: Groq is NOT a primary provider and its change detector stays independen
     throw new Error('primary provider must NOT be called when Groq says nothing changed');
   };
   try {
-    const regime = await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test', groqApiKey: 'gsk-test' },
+    const regime = await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test', groqApiKey: 'gsk-test' },
       () => getRegime('BTCUSDT', { pair: 'BTCUSDT' }, db));
     assert.equal(regime.regime, 'bullish', 'prior regime reused');
     assert.ok(seen.some((u) => u.includes('groq')), 'Groq detector ran');
@@ -216,7 +216,7 @@ test('G: truncated thinking retries through the provider with doubled max_tokens
       : jsonResponse(claudeBody(GOOD_JSON, { input_tokens: 100, output_tokens: 60 }));
   };
   try {
-    const regime = await withConfig({ mock: false, anthropicApiKey: 'sk-ant-test', groqApiKey: '' },
+    const regime = await withConfig({ mock: false, aiProvider: 'anthropic', anthropicApiKey: 'sk-ant-test', groqApiKey: '' },
       () => getRegime('BTCUSDT', { pair: 'BTCUSDT' }, db));
 
     assert.equal(bodies.length, 2, 'retried exactly once');

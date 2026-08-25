@@ -318,8 +318,8 @@ test('M: a Mistral failure NEVER contacts Anthropic, Gemini or OpenRouter', asyn
 
 // --- N. deterministic selection -----------------------------------------
 
-test('N: AI_PROVIDER=mistral always selects Mistral; Anthropic stays the default', () => {
-  assert.equal(config.aiProvider, 'anthropic', 'shipped default is Anthropic');
+test('N: AI_PROVIDER=mistral always selects Mistral; Gemini is the default', () => {
+  assert.equal(config.aiProvider, 'gemini', 'shipped default is Gemini');
   for (let i = 0; i < 5; i++) assert.equal(getPrimaryProvider('mistral'), mistralProvider);
   assert.equal(getPrimaryProvider('mistral').name, 'mistral');
   assert.equal(getPrimaryProvider('Mistral').name, 'mistral', 'case-insensitive, still deterministic');

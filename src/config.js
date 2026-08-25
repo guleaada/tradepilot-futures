@@ -77,10 +77,12 @@ export const config = {
 
   // --- AI layer ---
   // Which registered provider serves PRIMARY regime calls (see
-  // src/ai/providers/). Anthropic is the only one registered today; an
-  // unknown value degrades to the engine's safe no-trade fallback rather
-  // than crashing the cycle. There is no automatic cross-provider fallback.
-  aiProvider: (process.env.AI_PROVIDER || 'anthropic').toLowerCase(),
+  // src/ai/providers/, where anthropic, gemini, openrouter and mistral are all
+  // registered). Gemini is the default and is what the production workflow
+  // pins. An unknown value degrades to the engine's safe no-trade fallback
+  // rather than crashing the cycle. There is no automatic cross-provider
+  // fallback: a failing provider never causes a different one to be asked.
+  aiProvider: (process.env.AI_PROVIDER || 'gemini').toLowerCase(),
   aiModel: process.env.AI_MODEL || 'claude-sonnet-4-6',
   // The RAW generic model selector: '' when AI_MODEL was never set. Needed
   // because `aiModel` above already folds in an Anthropic-specific default,

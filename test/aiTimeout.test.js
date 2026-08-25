@@ -37,12 +37,16 @@ async function withAiEnv({ fetchImpl, timeoutMs = 60, groqKey = '' }, fn) {
   const saved = {
     fetch: globalThis.fetch,
     mock: config.mock,
+    provider: config.aiProvider,
     key: config.anthropicApiKey,
     groq: config.groqApiKey,
     timeout: config.aiRequestTimeoutMs,
   };
   globalThis.fetch = fetchImpl;
   config.mock = false;
+  // These tests exercise the ANTHROPIC provider specifically; state it rather
+  // than relying on whatever the shipped default happens to be.
+  config.aiProvider = 'anthropic';
   config.anthropicApiKey = 'sk-ant-TEST-SECRET-DO-NOT-LEAK';
   config.groqApiKey = groqKey;
   config.aiRequestTimeoutMs = timeoutMs;
@@ -51,6 +55,7 @@ async function withAiEnv({ fetchImpl, timeoutMs = 60, groqKey = '' }, fn) {
   } finally {
     globalThis.fetch = saved.fetch;
     config.mock = saved.mock;
+    config.aiProvider = saved.provider;
     config.anthropicApiKey = saved.key;
     config.groqApiKey = saved.groq;
     config.aiRequestTimeoutMs = saved.timeout;

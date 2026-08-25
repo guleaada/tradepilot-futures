@@ -261,7 +261,7 @@ async function sendEventAlerts(db, cycleStartIso) {
     const newSkip = db
       .prepare("SELECT id FROM events WHERE type = 'BUDGET_SKIPPED' AND ts >= ? LIMIT 1")
       .get(cycleStartIso);
-    if (newSkip) await sendAlert('⚠️ TradePilot-Futures: 3rd consecutive BUDGET_SKIPPED today — Claude regime calls are budget-starved.');
+    if (newSkip) await sendAlert('⚠️ TradePilot-Futures: 3rd consecutive BUDGET_SKIPPED today — primary regime calls are budget-starved.');
   }
 }
 

@@ -47,7 +47,11 @@ jobs:
 
       - name: Run one cycle (FUTURES TESTNET — no real funds)
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Primary provider key. Anthropic is deliberately NOT supplied: with no
+          # ANTHROPIC_API_KEY in the job environment, anthropicProvider.isConfigured()
+          # is false, so an Anthropic request cannot be issued even if AI_PROVIDER
+          # were misconfigured.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           # Futures TESTNET keys from testnet.binancefuture.com (fake funds;
           # rejected by mainnet). The executor base URL is hard-coded to the
@@ -74,11 +78,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           # --- manual shadow-test wiring (no effect on scheduled runs) ---
-          # Anthropic is pinned as the PRIMARY (decision-making) provider for
-          # every run. This restates the code default in src/config.js
-          # (`AI_PROVIDER || 'anthropic'`), so it changes no behavior; it is
-          # spelled out so a shadow selection can never become the primary.
-          AI_PROVIDER: anthropic
+          # Gemini is pinned as the PRIMARY (decision-making) provider for every
+          # run. This OVERRIDES the code default in src/config.js
+          # (`AI_PROVIDER || 'anthropic'`), so the value here is what selects the
+          # provider. It is a literal, not an expression, so no workflow input
+          # can change it and a shadow selection can never become the primary.
+          AI_PROVIDER: gemini
           # The three below resolve to '' on scheduled runs and on a manual run
           # with shadow_provider=none. Empty is handled exactly like unset:
           #   AI_SHADOW_MODE      -> compared === 'true'  -> false

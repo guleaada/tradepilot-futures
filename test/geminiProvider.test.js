@@ -291,8 +291,8 @@ test('J: Gemini failure NEVER falls through to Anthropic', async () => {
   db.close();
 });
 
-test('J2: provider selection is deterministic and Anthropic remains the default', () => {
-  assert.equal(config.aiProvider, 'anthropic', 'shipped default is Anthropic');
+test('J2: provider selection is deterministic and Gemini is the default', () => {
+  assert.equal(config.aiProvider, 'gemini', 'shipped default is Gemini');
   assert.equal(getPrimaryProvider('gemini'), geminiProvider);
   assert.equal(getPrimaryProvider('gemini').name, 'gemini');
   assert.ok(listPrimaryProviders().includes('gemini'));

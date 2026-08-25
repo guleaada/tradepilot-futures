@@ -16,6 +16,7 @@ import {
 } from '../src/ai/evaluationContract.js';
 import { buildMarketSummary, evaluateRegime, parseRegimeResponse } from '../src/ai/regime.js';
 import { runShadowEvaluation } from '../src/ai/shadow.js';
+import { getDailySpend } from '../src/ai/budget.js';
 
 // Bump BOTH when the prompt text changes. This pin is the whole point: an
 // unversioned prompt edit must fail CI rather than silently invalidate
@@ -760,4 +761,183 @@ test('a chop regime with a directional lean is permitted (documented, not a cont
   assert.equal(r.ok, true);
   assert.equal(r.value.direction, 'long');
   assert.equal(r.value.regime, 'chop', 'the regime is what the engine would act on');
+});
+
+// =========================================================================
+// 9. GEMINI AS PRIMARY (provider-selection contract, requirements 2, 6-8)
+// =========================================================================
+
+const GEMINI_BASE = {
+  mock: false, groqApiKey: '', aiProvider: 'gemini',
+  anthropicApiKey: '',                 // exactly the production job environment
+  geminiApiKey: 'test-not-real', aiModelOverride: '', aiRequestTimeoutMs: 1000,
+  aiShadowMode: true, aiShadowProviders: ['mistral'], mistralApiKey: 'test-not-real',
+};
+
+// Routes by host and FAILS LOUDLY if Anthropic is ever contacted.
+function geminiFetch({ geminiText, mistralText, counters }) {
+  return async (url) => {
+    const u = String(url);
+    if (u.includes('generativelanguage')) {
+      counters.gemini += 1;
+      if (geminiText === 'error') return new Response('boom', { status: 500 });
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: geminiText }] } }],
+        usageMetadata: { promptTokenCount: 2000, candidatesTokenCount: 400 },
+        modelVersion: 'gemini-2.5-flash',
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (u.includes('mistral')) {
+      counters.mistral += 1;
+      return new Response(JSON.stringify({
+        model: 'mistral-large-2512', choices: [{ message: { content: mistralText } }],
+        usage: { prompt_tokens: 100, completion_tokens: 50 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    counters.anthropic += 1;
+    throw new Error('ANTHROPIC WAS CONTACTED — provider isolation broken');
+  };
+}
+
+async function geminiCycle(db, pair, { geminiText, mistralText, overrides = {} } = {}) {
+  const counters = { gemini: 0, mistral: 0, anthropic: 0 };
+  const savedFetch = globalThis.fetch;
+  const savedCfg = { ...config };
+  globalThis.fetch = geminiFetch({ geminiText, mistralText, counters });
+  Object.assign(config, GEMINI_BASE, overrides);
+  try {
+    const summary = { pair, price: 60000 };
+    const { regime, evaluation } = await evaluateRegime(pair, summary, db, Date.now(), { snapshotId: `g-${pair}` });
+    if (evaluation.fresh) await runShadowEvaluation({ pair, summary, snapshotId: `g-${pair}`, db });
+    return { regime, evaluation, counters };
+  } finally {
+    globalThis.fetch = savedFetch;
+    Object.assign(config, savedCfg);
+  }
+}
+
+const GEM_OK = ev({ regime: 'bearish', confidence: 71, trade_allowed: true, reasoning: 'Gemini primary.' });
+const SHADOW_LOUD = ev({ regime: 'bullish', confidence: 100, trade_allowed: true, reasoning: 'shadow shouting' });
+
+test('R2: Gemini is authoritative — its regime is what the engine receives', async () => {
+  const db = openDb(':memory:');
+  const out = await geminiCycle(db, 'BTCUSDT', { geminiText: GEM_OK, mistralText: SHADOW_LOUD });
+
+  assert.equal(out.counters.gemini, 1, 'Gemini was called');
+  assert.equal(out.counters.anthropic, 0, 'Anthropic was never contacted');
+  assert.equal(out.evaluation.fresh, true);
+  assert.equal(out.evaluation.outcome, 'fresh');
+
+  const p = db.prepare('SELECT * FROM regime_calls ORDER BY id DESC LIMIT 1').get();
+  assert.equal(p.provider, 'gemini');
+  assert.equal(p.model, 'gemini-2.5-flash');
+  assert.equal(p.pricing_status, 'exact', 'gemini-2.5-flash is exactly priced');
+  // The regime handed to the engine is Gemini's, not the shadow's.
+  assert.equal(out.regime.regime, 'bearish');
+  assert.equal(out.regime.confidence, 71);
+  const shadow = db.prepare('SELECT * FROM ai_shadow_calls ORDER BY id DESC LIMIT 1').get();
+  assert.equal(shadow.provider, 'mistral');
+  assert.equal(shadow.confidence, 100, 'the shadow disagreed at max conviction...');
+  assert.equal(out.regime.confidence, 71, '...and the decision was unchanged');
+  db.close();
+});
+
+test('R2: Gemini spend accrues to gemini, never to anthropic', async () => {
+  const db = openDb(':memory:');
+  await geminiCycle(db, 'ETHUSDT', { geminiText: GEM_OK, mistralText: SHADOW_LOUD });
+  assert.ok(getDailySpend(db, undefined, 'gemini') > 0, 'gemini bucket charged');
+  assert.equal(getDailySpend(db, undefined, 'anthropic'), 0, 'anthropic bucket untouched');
+  assert.ok(getDailySpend(db, undefined, 'mistral') > 0, 'shadow charged to its own bucket');
+  db.close();
+});
+
+test('R6 + R7: with Gemini primary, shadow state cannot change the engine decision', async () => {
+  // Same Gemini primary; three different shadow states in the database.
+  const primary = { regime: 'bullish', confidence: 64, trade_allowed: true, reasoning: 'x' };
+  const dbs = [];
+  const results = [];
+  for (const shadow of [
+    { regime: 'bearish', confidence: 100, trade_allowed: true },
+    { regime: 'bullish', confidence: 100, trade_allowed: true },
+    null,
+  ]) {
+    const db = openDb(':memory:');
+    if (shadow) writeShadow(db, shadow);
+    results.push(await rulesWith(db, primary));
+    dbs.push(db);
+  }
+  const [a, b, c] = results;
+  assert.deepEqual(a.actions, b.actions, 'opposite shadow changed nothing');
+  assert.deepEqual(a.actions, c.actions, 'absent shadow changed nothing');
+  assert.ok(a.calls.some((x) => x.method === 'openPosition'), 'the trade path was genuinely reached');
+  const open = (x) => x.actions.find((y) => y.type === 'open');
+  for (const other of [b, c]) {
+    assert.equal(open(other).qty, open(a).qty, 'shadow cannot alter sizing');
+    assert.equal(open(other).stop, open(a).stop, 'shadow cannot alter the stop');
+    assert.equal(open(other).tp, open(a).tp, 'shadow cannot alter the take-profit');
+  }
+  for (const db of dbs) db.close();
+});
+
+test('R7: a max-conviction shadow cannot trade when the Gemini primary declines', async () => {
+  const db = openDb(':memory:');
+  writeShadow(db, { regime: 'bullish', confidence: 100, trade_allowed: true });
+  const { actions, calls } = await rulesWith(db,
+    { regime: 'bearish', confidence: 30, trade_allowed: false, reasoning: 'weak' });
+  assert.equal(calls.length, 0, 'executor never called');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM trades').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM orders').get().n, 0);
+  assert.ok(actions.every((a) => a.type === 'no_entry'));
+  db.close();
+});
+
+test('R8: a missing GEMINI key takes the existing safe fallback, unchanged', async () => {
+  const db = openDb(':memory:');
+  const out = await geminiCycle(db, 'SOLUSDT', {
+    geminiText: GEM_OK, mistralText: SHADOW_LOUD, overrides: { geminiApiKey: '' },
+  });
+  assert.equal(out.evaluation.outcome, 'missing_key');
+  assert.equal(out.evaluation.fresh, false);
+  assert.equal(out.evaluation.provider, 'gemini', 'the failure is attributed to gemini');
+  assert.equal(out.counters.gemini, 0, 'no HTTP request without a key');
+  assert.equal(out.counters.anthropic, 0, 'and Anthropic is NOT tried as a fallback');
+  assert.equal(out.counters.mistral, 0, 'a non-fresh primary opens no shadow gate');
+  // The existing safe fallback: no-trade regime, no shadow row.
+  assert.equal(out.regime.trade_allowed, false);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM ai_shadow_calls').get().c, 0);
+  db.close();
+});
+
+test('R8: Gemini provider error and malformed output both fall back safely', async () => {
+  for (const [label, geminiText, expected] of [
+    ['provider error', 'error', 'provider_error'],
+    ['malformed output', 'not json at all', 'parse_failure'],
+  ]) {
+    const db = openDb(':memory:');
+    const out = await geminiCycle(db, 'XRPUSDT', { geminiText, mistralText: SHADOW_LOUD });
+    assert.equal(out.evaluation.fresh, false, label);
+    assert.equal(out.evaluation.outcome, expected, label);
+    assert.equal(out.counters.anthropic, 0, `${label}: no Anthropic fallback`);
+    assert.equal(out.counters.mistral, 0, `${label}: no shadow call`);
+    assert.equal(out.regime.trade_allowed, false, `${label}: safe fallback regime`);
+    db.close();
+  }
+});
+
+test('R3: Mistral stays shadow-only — it is never selected as primary', async () => {
+  const { resolveShadowProviders } = await import('../src/ai/shadow.js');
+  const saved = { ...config };
+  Object.assign(config, GEMINI_BASE);
+  try {
+    // Configured as a shadow, it resolves as a shadow.
+    assert.deepEqual(resolveShadowProviders(config).providers.map((p) => p.name), ['mistral']);
+    // The primary is decided solely by config.aiProvider, which is gemini.
+    assert.equal(config.aiProvider, 'gemini');
+    // And a shadow list naming the PRIMARY is dropped, never promoted.
+    Object.assign(config, { aiShadowProviders: ['gemini', 'mistral'] });
+    assert.deepEqual(resolveShadowProviders(config).providers.map((p) => p.name), ['mistral'],
+      'the primary is never also run as its own shadow');
+  } finally {
+    Object.assign(config, saved);
+  }
 });

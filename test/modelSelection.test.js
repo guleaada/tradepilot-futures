@@ -144,8 +144,8 @@ test('D2: one AI_MODEL value applies to whichever provider is selected', async (
 
 // --- E. deterministic selection -----------------------------------------
 
-test('E: AI_PROVIDER selection stays deterministic and Anthropic stays the default', () => {
-  assert.equal(config.aiProvider, 'anthropic');
+test('E: AI_PROVIDER selection stays deterministic and Gemini is the default', () => {
+  assert.equal(config.aiProvider, 'gemini');
   const expected = { anthropic: anthropicProvider, gemini: geminiProvider, openrouter: openrouterProvider };
   for (const [name, provider] of Object.entries(expected)) {
     for (let i = 0; i < 3; i++) assert.equal(getPrimaryProvider(name), provider, `${name} resolves consistently`);
