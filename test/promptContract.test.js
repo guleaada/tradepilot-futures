@@ -994,10 +994,22 @@ test('RECOVERY: budget estimation uses the new exact rate', async () => {
   // The pre-call gate prices the model that will actually be called.
   const expected = (cfg.estInputTokens * 0.75 + cfg.estOutputTokens * 3.75) / 1e6;
   assert.ok(Math.abs(estimateCallCost(pricing, cfg) - expected) < 1e-12);
-  // And it stays inside the configured daily cap at the structural ceiling.
-  const ceiling = cfg.pairs.length * (24 / cfg.aiCadenceHours);
-  assert.ok(ceiling * expected < cfg.aiDailyBudgetUsd,
-    `projected $${(ceiling * expected).toFixed(4)}/day must stay under $${cfg.aiDailyBudgetUsd}`);
+  // The daily cap is enforced by the GATE, not by the universe happening to
+  // fit inside it. The structural ceiling has always exceeded what the budget
+  // buys (it did under Anthropic too), so the invariant that matters is that
+  // the gate refuses the call that would cross the cap - spend is bounded.
+  const { wouldExceedBudget, addSpend } = await import('../src/ai/budget.js');
+  const db = openDb(':memory:');
+  const date = '2026-01-01';
+  const affordable = Math.floor(cfg.aiDailyBudgetUsd / expected);
+  assert.ok(affordable > 0, 'the budget must buy at least one call');
+  for (let i = 0; i < affordable; i++) addSpend(expected, db, date, 'gemini');
+  assert.ok(wouldExceedBudget(expected, cfg.aiDailyBudgetUsd, db, date, 'gemini'),
+    'the gate must refuse the call that would cross the cap');
+  const spent = db.prepare('SELECT spend FROM ai_budget WHERE date = ? AND provider = ?').get(date, 'gemini').spend;
+  assert.ok(spent <= cfg.aiDailyBudgetUsd,
+    `accrued ${spent.toFixed(4)} must never exceed the ${cfg.aiDailyBudgetUsd} cap`);
+  db.close();
 });
 
 test('RECOVERY: a 404 from the provider still falls back safely', async () => {

@@ -152,7 +152,19 @@ export const config = {
   groqApiKey: process.env.GROQ_API_KEY || '',
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
   aiDailyBudgetUsd: num(process.env.AI_DAILY_BUDGET_USD, 0.5),
-  aiMaxOutputTokens: num(process.env.AI_MAX_OUTPUT_TOKENS, 1024),
+  // Output ceiling per AI request. Raised from 1024 on 2026-08-25 after
+  // gemini-3.6-flash truncated 7 of 14 production evaluations: Gemini 3.x
+  // emits INTERNAL thinking tokens that count toward this ceiling, and every
+  // failure stopped at exactly 1020/1024 tokens mid-JSON while every success
+  // came in under it (811-984). The thinking is not an emitted <thinking> tag,
+  // so regime.js's truncation-salvage retry cannot see it; the only lever that
+  // reliably leaves room for the JSON is a larger ceiling.
+  //
+  // NOT set via thinkingConfig: Gemini 3 controls reasoning with
+  // `thinking_level` (low|medium|high), not the 2.5-era `thinkingBudget` the
+  // provider currently sends, so that knob is inert for this model. Changing
+  // the provider's request shape is a separate, testable change.
+  aiMaxOutputTokens: num(process.env.AI_MAX_OUTPUT_TOKENS, 2048),
   // Hard ceiling on every outbound AI HTTP request (Claude + the Groq
   // pre-filter). Without it a hung provider socket stalls the whole cycle:
   // the GitHub Actions job has a 10-minute timeout, so a single wedged
@@ -166,7 +178,12 @@ export const config = {
   // env-configurable (a price is a verified external fact, not a tunable),
   // and an unknown pair resolves to 'unknown' rather than to a default.
   estInputTokens: num(process.env.AI_EST_INPUT_TOKENS, 2000),
-  estOutputTokens: num(process.env.AI_EST_OUTPUT_TOKENS, 400),
+  // Raised from 400 on 2026-08-25 to match observed Gemini 3.x output:
+  // completed responses used 811-984 output tokens INCLUDING thinking, which
+  // is billed as output. 400 under-estimated by ~2.5x, so the pre-call budget
+  // gate tripped later than intended. Actual spend was always recorded from
+  // real usage; this only affects when the gate engages.
+  estOutputTokens: num(process.env.AI_EST_OUTPUT_TOKENS, 1200),
   budgetDecayPoints: num(process.env.BUDGET_DECAY_POINTS, 20),
 
   // --- leverage (futures) ---
