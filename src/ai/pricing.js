@@ -49,6 +49,27 @@ export const PRICING = Object.freeze({
     // Thinking tokens are INCLUDED in the output price, and the API reports
     // thoughtsTokenCount separately from candidatesTokenCount — which is why
     // the Gemini provider sums the two into outputTokens.
+    // CURRENT production model. Verified 2026-08-25 against Google's official
+    // pricing page: "Input price ... $0.75 through December 31, 2026" and
+    // "Output price (including thinking tokens) ... $3.75 through December 31,
+    // 2026". Thinking tokens are billed as OUTPUT, which is exactly how the
+    // Gemini provider reports them (thoughtsTokenCount summed into
+    // outputTokens), so outputPerMTok applies to them correctly.
+    //
+    // LIMITATION: Google has published a scheduled increase to $1.50/$7.50 on
+    // 2027-01-01. This registry stores one rate per (provider, model) and
+    // cannot express a future-dated change. The staleness threshold
+    // (PRICING_FRESHNESS_DAYS = 90) flags this entry from ~2026-11-23, before
+    // the increase takes effect, so the wrong rate cannot silently survive it.
+    // Context caching ($0.075/MTok) is deliberately not modelled: this repo
+    // sends no caching directives, so a cache hit only makes the real bill
+    // lower than est_cost.
+    'gemini-3.6-flash': {
+      inputPerMTok: 0.75, outputPerMTok: 3.75,
+      verifiedOn: '2026-08-25', source: 'ai.google.dev/gemini-api/docs/pricing',
+    },
+    // Retained for HISTORICAL rows only: this id returns 404 for this account
+    // as of 2026-08-25. Removing it would make already-recorded costs unknown.
     'gemini-2.5-flash': {
       inputPerMTok: 0.30, outputPerMTok: 2.50,
       verifiedOn: '2026-08-21', source: 'ai.google.dev/gemini-api/docs/pricing',

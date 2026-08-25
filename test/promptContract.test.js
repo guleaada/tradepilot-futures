@@ -784,7 +784,7 @@ function geminiFetch({ geminiText, mistralText, counters }) {
       return new Response(JSON.stringify({
         candidates: [{ content: { parts: [{ text: geminiText }] } }],
         usageMetadata: { promptTokenCount: 2000, candidatesTokenCount: 400 },
-        modelVersion: 'gemini-2.5-flash',
+        modelVersion: 'gemini-3.6-flash',
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     if (u.includes('mistral')) {
@@ -830,8 +830,8 @@ test('R2: Gemini is authoritative — its regime is what the engine receives', a
 
   const p = db.prepare('SELECT * FROM regime_calls ORDER BY id DESC LIMIT 1').get();
   assert.equal(p.provider, 'gemini');
-  assert.equal(p.model, 'gemini-2.5-flash');
-  assert.equal(p.pricing_status, 'exact', 'gemini-2.5-flash is exactly priced');
+  assert.equal(p.model, 'gemini-3.6-flash', 'the configured production model');
+  assert.equal(p.pricing_status, 'exact', 'gemini-3.6-flash is exactly priced');
   // The regime handed to the engine is Gemini's, not the shadow's.
   assert.equal(out.regime.regime, 'bearish');
   assert.equal(out.regime.confidence, 71);
@@ -940,4 +940,75 @@ test('R3: Mistral stays shadow-only — it is never selected as primary', async 
   } finally {
     Object.assign(config, saved);
   }
+});
+
+// =========================================================================
+// 10. GEMINI MODEL RECOVERY (gemini-2.5-flash 404'd for this account)
+// =========================================================================
+
+const RETIRED_MODEL = 'gemini-2.5-flash';
+const PRODUCTION_MODEL = 'gemini-3.6-flash';
+
+test('RECOVERY: the retired model is no longer the configured production model', async () => {
+  const { config: cfg } = await import('../src/config.js');
+  // 2026-08-25: every call to gemini-2.5-flash returned HTTP 404 for this
+  // account ("no longer available to new users"), so 14/14 evaluations became
+  // provider_error. The configured default must not be that id any more.
+  assert.notEqual(cfg.geminiModel, RETIRED_MODEL, 'the 404-ing model must not be the default');
+  assert.equal(cfg.geminiModel, PRODUCTION_MODEL);
+});
+
+test('RECOVERY: the Gemini provider resolves the selected model', async () => {
+  const { config: cfg } = await import('../src/config.js');
+  const { geminiProvider } = await import('../src/ai/providers/index.js');
+  const savedOverride = cfg.aiModelOverride;
+  cfg.aiModelOverride = '';
+  try {
+    assert.equal(geminiProvider.model, PRODUCTION_MODEL);
+  } finally { cfg.aiModelOverride = savedOverride; }
+});
+
+test('RECOVERY: the selected model has an EXACT pricing entry at the verified rate', async () => {
+  const { resolvePricing, PRICING } = await import('../src/ai/pricing.js');
+  const r = resolvePricing('gemini', PRODUCTION_MODEL);
+  assert.equal(r.status, 'exact', 'an unpriced production model would leave cost unknown');
+  // Verified 2026-08-25 from ai.google.dev/gemini-api/docs/pricing:
+  // input $0.75, output (including thinking tokens) $3.75, through 2026-12-31.
+  assert.equal(r.inputPerMTok, 0.75);
+  assert.equal(r.outputPerMTok, 3.75);
+  assert.match(PRICING.gemini[PRODUCTION_MODEL].source, /ai\.google\.dev/);
+  // The retired id stays priced so already-recorded historical costs remain
+  // resolvable; it simply is not the default any more.
+  assert.equal(resolvePricing('gemini', RETIRED_MODEL).status, 'exact');
+  // No guessing: an unknown Gemini id is still unknown.
+  assert.equal(resolvePricing('gemini', 'gemini-9.9-flash').status, 'unknown');
+});
+
+test('RECOVERY: budget estimation uses the new exact rate', async () => {
+  const { config: cfg } = await import('../src/config.js');
+  const { resolvePricing } = await import('../src/ai/pricing.js');
+  const { estimateCallCost, costFromUsage } = await import('../src/ai/budget.js');
+  const pricing = resolvePricing('gemini', PRODUCTION_MODEL);
+  // 1M in + 1M out at the verified rate.
+  assert.equal(costFromUsage(1_000_000, 1_000_000, pricing), 0.75 + 3.75);
+  // The pre-call gate prices the model that will actually be called.
+  const expected = (cfg.estInputTokens * 0.75 + cfg.estOutputTokens * 3.75) / 1e6;
+  assert.ok(Math.abs(estimateCallCost(pricing, cfg) - expected) < 1e-12);
+  // And it stays inside the configured daily cap at the structural ceiling.
+  const ceiling = cfg.pairs.length * (24 / cfg.aiCadenceHours);
+  assert.ok(ceiling * expected < cfg.aiDailyBudgetUsd,
+    `projected $${(ceiling * expected).toFixed(4)}/day must stay under $${cfg.aiDailyBudgetUsd}`);
+});
+
+test('RECOVERY: a 404 from the provider still falls back safely', async () => {
+  // Exactly the production failure: HTTP 404 for the model id.
+  const db = openDb(':memory:');
+  const out = await geminiCycle(db, 'BTCUSDT', { geminiText: 'error', mistralText: SHADOW_LOUD });
+  assert.equal(out.evaluation.outcome, 'provider_error');
+  assert.equal(out.evaluation.fresh, false);
+  assert.equal(out.regime.trade_allowed, false, 'safe no-trade fallback');
+  assert.equal(out.counters.anthropic, 0, 'no Anthropic fallback is introduced');
+  assert.equal(out.counters.mistral, 0, 'a failed primary opens no shadow gate');
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM ai_shadow_calls').get().c, 0);
+  db.close();
 });

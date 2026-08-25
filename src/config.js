@@ -106,7 +106,14 @@ export const config = {
   geminiBase: process.env.GEMINI_BASE || 'https://generativelanguage.googleapis.com',
   // Explicit and configurable — never hard-coded at a call site. Verify the id
   // against Google's current model list before enabling in production.
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  //
+  // 'gemini-2.5-flash' was retired FOR THIS ACCOUNT on 2026-08-25: every call
+  // returned HTTP 404 "This model models/gemini-2.5-flash is no longer
+  // available to new users. Please update your code to use
+  // models/gemini-3.6-flash". Note the restriction is account-scoped, not a
+  // global retirement — Google's public model list still shows 2.5-flash as
+  // stable — so the id is kept priced in pricing.js for historical rows.
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
   // Gemini 2.5 models think internally by default, and those tokens are drawn
   // from the SAME maxOutputTokens budget as the visible answer — so a small
   // budget can be spent entirely on hidden reasoning, returning empty text.
