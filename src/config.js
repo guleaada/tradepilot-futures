@@ -165,13 +165,24 @@ export const config = {
   // provider currently sends, so that knob is inert for this model. Changing
   // the provider's request shape is a separate, testable change.
   aiMaxOutputTokens: num(process.env.AI_MAX_OUTPUT_TOKENS, 2048),
-  // Hard ceiling on every outbound AI HTTP request (Claude + the Groq
-  // pre-filter). Without it a hung provider socket stalls the whole cycle:
-  // the GitHub Actions job has a 10-minute timeout, so a single wedged
-  // request can kill exits/stop management for every pair behind it. Matches
-  // alert.js's 10s convention; a timeout is treated as a provider failure and
-  // falls back to the safe no-trade path.
-  aiRequestTimeoutMs: num(process.env.AI_REQUEST_TIMEOUT_MS, 10_000),
+  // Hard ceiling on every outbound AI HTTP request (primary provider + the
+  // Groq pre-filter). Without it a hung provider socket stalls the whole
+  // cycle: the GitHub Actions job has a 10-minute timeout, so a single wedged
+  // request can kill exits/stop management for every pair behind it. A timeout
+  // is treated as a provider failure and falls back to the safe no-trade path.
+  //
+  // Raised from 10s to 20s on 2026-08-26 on production evidence. Measured
+  // across three cycles, gemini-3.6-flash SUCCESSFUL responses had a median
+  // latency of 10.1s (min 5.8s, max 10.6s) against a 10.0s deadline - the
+  // deadline sat AT the median, so roughly half of all genuine responses were
+  // racing it, and 5 calls were cut off at 8.2-10.1s while still in flight.
+  // Gemini 3.x reasons internally before emitting, which is slower than the
+  // model this ceiling was originally tuned for.
+  //
+  // 20s is deliberately conservative rather than generous: at 17 pairs the
+  // worst case (every request hanging) is 340s of the 600s job budget, leaving
+  // real headroom. 30s would leave only ~90s. Observed cycles run 30-90s.
+  aiRequestTimeoutMs: num(process.env.AI_REQUEST_TIMEOUT_MS, 20_000),
   // NOTE: there is deliberately NO global `pricing` object here any more.
   // A single global rate silently mispriced every non-Anthropic provider.
   // Prices now live in src/ai/pricing.js keyed by (provider, model), are not

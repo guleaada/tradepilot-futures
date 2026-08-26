@@ -1024,3 +1024,88 @@ test('RECOVERY: a 404 from the provider still falls back safely', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM ai_shadow_calls').get().c, 0);
   db.close();
 });
+
+// =========================================================================
+// 11. REQUEST-DEADLINE REGRESSION (production latency evidence, 2026-08-26)
+// =========================================================================
+
+test('DEADLINE: the AI request timeout leaves headroom above observed Gemini latency', async () => {
+  const { config: cfg } = await import('../src/config.js');
+  // Measured in production across three cycles: successful gemini-3.6-flash
+  // responses had a MEDIAN latency of 10.1s against the old 10.0s deadline,
+  // so ~half of all genuine responses were racing it and 5 were cut off
+  // mid-flight. The deadline must sit clearly above the observed median.
+  const OBSERVED_MEDIAN_MS = 10_100;
+  const OBSERVED_MAX_MS = 10_600;
+  assert.ok(cfg.aiRequestTimeoutMs > OBSERVED_MEDIAN_MS,
+    `deadline ${cfg.aiRequestTimeoutMs}ms must exceed the observed median ${OBSERVED_MEDIAN_MS}ms`);
+  assert.ok(cfg.aiRequestTimeoutMs >= OBSERVED_MAX_MS * 1.5,
+    'deadline should carry real headroom over the observed maximum, not sit on it');
+});
+
+test('DEADLINE: the worst case still fits inside the GitHub job budget', async () => {
+  const { config: cfg } = await import('../src/config.js');
+  // The ceiling exists so one wedged socket cannot starve exits and stop
+  // management for every pair behind it. If EVERY pair hangs, the AI phase
+  // must still finish well inside the 10-minute job timeout.
+  const JOB_BUDGET_S = 600;
+  const worstCaseS = (cfg.pairs.length * cfg.aiRequestTimeoutMs) / 1000;
+  assert.ok(worstCaseS < JOB_BUDGET_S * 0.7,
+    `worst case ${worstCaseS}s must stay well under the ${JOB_BUDGET_S}s job budget`);
+  // And the ceiling must remain bounded - never disabled.
+  assert.ok(Number.isFinite(cfg.aiRequestTimeoutMs) && cfg.aiRequestTimeoutMs > 0);
+});
+
+test('DEADLINE: a timeout still takes the existing safe fallback, unchanged', async () => {
+  // Raising the ceiling must not change what a timeout MEANS. The stub hangs
+  // until the AbortSignal fires, holding an active handle because
+  // AbortSignal.timeout uses an UNREF'd timer - without a live handle the
+  // process would exit before the abort could land.
+  const db = openDb(':memory:');
+  const savedFetch = globalThis.fetch;
+  const savedCfg = { ...config };
+  let anthropicHits = 0;
+  let mistralHits = 0;
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes('anthropic')) { anthropicHits += 1; throw new Error('anthropic reached'); }
+    if (u.includes('mistral')) { mistralHits += 1; }
+    return new Promise((_, reject) => {
+      const socket = setTimeout(() => {}, 60_000); // stands in for an open socket
+      init?.signal?.addEventListener('abort', () => { clearTimeout(socket); reject(init.signal.reason); });
+    });
+  };
+  Object.assign(config, GEMINI_BASE, { aiRequestTimeoutMs: 150 });
+  try {
+    const summary = { pair: 'BTCUSDT', price: 1 };
+    const { regime, evaluation } = await evaluateRegime('BTCUSDT', summary, db, Date.now(), { snapshotId: 'to' });
+    if (evaluation.fresh) await runShadowEvaluation({ pair: 'BTCUSDT', summary, snapshotId: 'to', db });
+    assert.equal(evaluation.outcome, 'timeout', 'a hung request is classified as a timeout');
+    assert.equal(evaluation.fresh, false);
+    assert.equal(regime.trade_allowed, false, 'safe no-trade fallback');
+    assert.equal(anthropicHits, 0, 'no Anthropic fallback');
+    assert.equal(mistralHits, 0, 'a non-fresh primary opens no shadow gate');
+    assert.equal(db.prepare('SELECT COUNT(*) c FROM ai_shadow_calls').get().c, 0);
+  } finally {
+    globalThis.fetch = savedFetch;
+    Object.assign(config, savedCfg);
+    db.close();
+  }
+});
+
+test('QUOTA: a 429 is a provider error that fails closed and costs nothing', async () => {
+  // Production shows 429s rejecting in 0.1-0.2s with zero tokens billed.
+  // No retry is layered on top: retrying a rate limit multiplies the very
+  // calls that caused it. It must simply fall back safely.
+  const db = openDb(':memory:');
+  const out = await geminiCycle(db, 'ETHUSDT', { geminiText: 'error', mistralText: SHADOW_LOUD });
+  assert.equal(out.evaluation.outcome, 'provider_error');
+  assert.equal(out.evaluation.fresh, false);
+  assert.equal(out.regime.trade_allowed, false);
+  assert.equal(out.counters.gemini, 1, 'exactly one attempt - no retry storm');
+  assert.equal(out.counters.anthropic, 0);
+  const row = db.prepare('SELECT * FROM regime_calls ORDER BY id DESC LIMIT 1').get();
+  assert.equal(row.est_cost, 0, 'a rejected request bills nothing');
+  assert.equal(row.pricing_status, null);
+  db.close();
+});
